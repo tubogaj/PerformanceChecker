@@ -18,25 +18,21 @@ body {
 h1 {
   text-align: center;
 }
-
 input, button {
   padding: 10px;
   margin: 5px;
 }
-
 button {
   background: #000;
   color: #fff;
   border: none;
   cursor: pointer;
 }
-
 .section {
   margin-top: 20px;
   padding: 20px;
   border: 1px solid #000;
 }
-
 </style>
 </head>
 
@@ -45,10 +41,8 @@ button {
 <div class="container">
 <h1>Conan<br>Account Performance Checker</h1>
 
-<!-- INPUTS -->
 <div>
-  <input type="file" id="fileInput" accept=".csv">
-  <br><br>
+  <input type="file" id="fileInput" accept=".csv"><br><br>
 
   Name:<br>
   <input type="text" id="name"><br>
@@ -60,7 +54,6 @@ button {
   <input type="date" id="onboarding"><br>
 </div>
 
-<!-- BUTTONS -->
 <div>
   <button onclick="run('weekly')">Weekly</button>
   <button onclick="run('30')">30 Days</button>
@@ -69,7 +62,6 @@ button {
   <button onclick="run('outlook')">Outlook</button>
 </div>
 
-<!-- RESULT -->
 <div id="result" class="section"></div>
 
 </div>
@@ -102,9 +94,9 @@ function loadFile(callback) {
   reader.readAsText(file);
 }
 
-function calcData(start, end) {
+function calcData(start, end, onboard) {
 
-  let deposit = 0;
+  let initialDeposit = 0;
   let closedProfit = 0;
   let floating = 0;
   let firstClose = null;
@@ -112,36 +104,59 @@ function calcData(start, end) {
 
   rows.forEach(r => {
 
-    if (r.Type?.toLowerCase().includes("deposit") || r.Type?.toLowerCase().includes("withdraw")) {
-      funding.push(`${r["Close date"]} → ${r["Net profit"]}`);
-      deposit += Number(r["Net profit"]) || 0;
+    let date = new Date(r["Close date"]);
+    let profit = Number(r["Net profit"]) || 0;
+    let type = r.Type?.toLowerCase() || "";
+
+    // INITIAL DEPOSIT (from onboarding)
+    if (type.includes("deposit") && date >= onboard) {
+      initialDeposit += profit;
     }
 
+    // FUNDING (ONLY WITHIN SELECTED PERIOD)
+    if ((type.includes("deposit") || type.includes("withdraw")) &&
+        date >= start && date <= end) {
+      funding.push(`${r["Close date"]} → ${profit}`);
+    }
+
+    // CLOSED TRADES
     if (r.Type !== "Open position" && r["Close date"]) {
-      let d = new Date(r["Close date"]);
-      let profit = Number(r["Net profit"]) || 0;
 
-      if (!firstClose) firstClose = r["Close date"];
+      if (!firstClose && date >= onboard) {
+        firstClose = r["Close date"];
+      }
 
-      if (!start || (d >= start && d <= end)) {
+      if (date >= start && date <= end) {
         closedProfit += profit;
       }
     }
 
+    // FLOATING
     if (r.Type === "Open position") {
-      floating += Number(r["Net profit"]) || 0;
+      floating += profit;
     }
 
   });
 
-  let balance = deposit + closedProfit;
-  let totalReturn = balance - deposit;
-  let percent = deposit ? (totalReturn / deposit) * 100 : 0;
+  // TOTAL RETURN (ONBOARDING → END DATE)
+  let totalProfitFromStart = 0;
+
+  rows.forEach(r => {
+    let date = new Date(r["Close date"]);
+    let profit = Number(r["Net profit"]) || 0;
+
+    if (date >= onboard && date <= end && r.Type !== "Open position") {
+      totalProfitFromStart += profit;
+    }
+  });
+
+  let percent = initialDeposit
+    ? (totalProfitFromStart / initialDeposit) * 100
+    : 0;
 
   return {
-    deposit,
-    balance,
-    totalReturn,
+    initialDeposit,
+    totalReturn: totalProfitFromStart,
     percent,
     closedProfit,
     floating,
@@ -183,28 +198,43 @@ function run(type) {
       end.setDate(end.getDate() + 90);
     }
 
-    let data = calcData(start, end);
+    if (type === "outlook") {
+      start = onboard;
+      end = new Date();
+    }
+
+    let data = calcData(start, end, onboard);
 
     let paragraph = "";
 
     if (type === "weekly") {
-      paragraph = `Over the selected weekly period, the account delivered a closed performance of ${data.closedProfit.toFixed(2)}, reflecting short-term trading behavior and recent execution efficiency.`;
+      paragraph = `Over the past week, the account moved through a short-term cycle of execution, capturing a closed result of ${data.closedProfit.toFixed(2)}. 
+This period reflects the most recent trading behavior, where positions were actively managed and adjusted in response to market conditions. 
+Short-term movement like this highlights whether the system is currently capitalizing on opportunities efficiently or facing temporary pressure from market volatility.`;
     }
 
     if (type === "30") {
-      paragraph = `During the first 30 days from onboarding, the account produced a return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%). This phase typically reflects initial system adaptation and early-stage performance expectations.`;
+      paragraph = `From the onboarding phase through the first 30 days, the account began establishing its trading rhythm. 
+During this period, a total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%) was achieved. 
+This phase often includes early positioning, initial wins, and adjustments, giving a realistic view of how the system behaves when first exposed to live market conditions.`;
     }
 
     if (type === "60") {
-      paragraph = `Comparing the 30-day and 60-day performance window, the account shows developing consistency. Current total return stands at ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%), indicating performance progression and stability trends.`;
+      paragraph = `At the 60-day mark, the account shows a clearer pattern of behavior beyond initial execution. 
+With a total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%), this phase reveals whether the system is gaining consistency, maintaining stability, or encountering extended drawdowns. 
+It reflects how well the strategy sustains performance over time.`;
     }
 
     if (type === "90") {
-      paragraph = `Across the full 90-day cycle, the account demonstrates overall system behavior, including growth phases and drawdowns. Total return is ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%).`;
+      paragraph = `Across the full 90-day cycle, the account demonstrates its complete performance profile. 
+The total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%) reflects how the system navigated both favorable and challenging conditions. 
+This longer period gives a more reliable picture of consistency, recovery ability, and overall trading discipline.`;
     }
 
     if (type === "outlook") {
-      paragraph = `Based on historical performance, the account shows a projected trajectory aligned with its current profitability and consistency levels. While fluctuations remain part of trading, the system indicates a realistic growth potential moving forward.`;
+      paragraph = `Looking forward, the account’s trajectory suggests a continuation of its current behavior pattern. 
+Based on accumulated performance, the system demonstrates a balance between growth opportunities and risk exposure. 
+While fluctuations are expected, the data indicates a realistic path of gradual performance development over time.`;
     }
 
     let trackDays = Math.floor((new Date() - onboard) / (1000*60*60*24));
@@ -216,12 +246,12 @@ function run(type) {
 
       <b>Total Return:</b> ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%)<br>
       <b>Track Record:</b> ${trackDays} days<br>
-      <b>Closed Profit:</b> ${data.closedProfit.toFixed(2)}<br>
+      <b>Closed Profit (Selected Period):</b> ${data.closedProfit.toFixed(2)}<br>
       <b>Floating P/L:</b> ${data.floating.toFixed(2)}<br>
-      <b>First Trade Close:</b> ${data.firstClose || "N/A"}<br>
+      <b>First Trade Close:</b> ${data.firstClose || "N/A"}<br><br>
 
-      <b>Funding Activity:</b><br>
-      ${data.funding.join("<br>") || "None"}<br><br>
+      <b>Funding Activity (Selected Period):</b><br>
+      ${data.funding.length ? data.funding.join("<br>") : "None"}<br><br>
 
       <p>${paragraph}</p>
     `;
