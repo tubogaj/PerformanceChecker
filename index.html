@@ -6,41 +6,113 @@
 
 <style>
 body {
-  font-family: 'Segoe UI';
-  background: linear-gradient(135deg,#0f172a,#1e293b);
-  color:#fff;
-  padding:40px;
+  font-family: 'Segoe UI', Arial;
+  background: #0a0a0a;
+  color: #fff;
+  padding: 40px;
 }
-.container { max-width:1100px;margin:auto; }
+
+/* CONTAINER */
+.container {
+  max-width: 1100px;
+  margin: auto;
+}
+
+/* GLASS EFFECT */
 .glass {
-  background:rgba(255,255,255,0.08);
-  backdrop-filter:blur(15px);
-  padding:25px;
-  border-radius:14px;
-  margin-bottom:20px;
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 20px;
 }
-.header { display:flex;justify-content:space-between;align-items:center; }
-.logo { height:90px; }
 
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  height: 100px;
+}
+
+/* INPUTS */
 input {
-  padding:10px;
-  border-radius:8px;
-  border:none;
-  background:rgba(255,255,255,0.1);
-  color:#fff;
-  margin:5px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: #fff;
+  margin: 6px 4px;
+  width: 220px;
 }
-button {
-  padding:10px 18px;
-  border:none;
-  border-radius:8px;
-  background:rgba(255,255,255,0.15);
-  color:#fff;
-  cursor:pointer;
-}
-button:hover { background:rgba(255,255,255,0.3); }
 
-.section-title { font-weight:600;margin-bottom:10px; }
+input::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+/* BUTTONS */
+button {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  cursor: pointer;
+  transition: 0.25s ease;
+  font-weight: 500;
+}
+
+button:hover {
+  background: rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+}
+
+/* SECTION TITLE */
+.section-title {
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  color: rgba(255,255,255,0.7);
+  text-transform: uppercase;
+}
+
+/* DATA BLOCK */
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+  gap: 12px;
+}
+
+.data-item {
+  background: rgba(255,255,255,0.03);
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.data-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.data-value {
+  font-size: 16px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* WEEKLY RANGE */
+#weeklyRange {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+}
 </style>
 </head>
 
@@ -48,35 +120,44 @@ button:hover { background:rgba(255,255,255,0.3); }
 
 <div class="container">
 
+<!-- HEADER -->
 <div class="glass header">
-  <h2>Account Performance Checker</h2>
+  <h2 style="font-weight:500;">Account Performance Checker</h2>
   <img src="logo.png" class="logo">
 </div>
 
+<!-- INPUT -->
 <div class="glass">
-<input type="file" id="fileInput" accept=".csv"><br>
-<input type="text" id="name" placeholder="Client Name">
-<input type="text" id="software" placeholder="Software">
-<input type="date" id="onboarding">
+  <input type="file" id="fileInput" accept=".csv"><br>
 
-<div id="weeklyRange" style="display:none;">
-Start: <input type="date" id="weekStart">
-End: <input type="date" id="weekEnd">
+  <input type="text" id="name" placeholder="Client Name">
+  <input type="text" id="software" placeholder="Software">
+  <input type="date" id="onboarding">
+
+  <div id="weeklyRange" style="display:none;">
+    Start: <input type="date" id="weekStart">
+    End: <input type="date" id="weekEnd">
+  </div>
+
+  <br><br>
+
+  <button onclick="run('weekly')">Weekly</button>
+  <button onclick="run('30')">30 Days</button>
+  <button onclick="run('60')">60 Days</button>
+  <button onclick="run('90')">90 Days</button>
 </div>
 
-<br>
-<button onclick="run('weekly')">Weekly</button>
-<button onclick="run('30')">30 Days</button>
-<button onclick="run('60')">60 Days</button>
-<button onclick="run('90')">90 Days</button>
-</div>
-
+<!-- OVERVIEW -->
 <div id="overview" class="glass"></div>
+
+<!-- BREAKDOWN -->
 <div id="breakdown" class="glass"></div>
 
 </div>
 
 <script>
+
+// ===== SAME LOGIC (UNCHANGED) =====
 
 let rows=[];
 
@@ -104,8 +185,6 @@ function loadFile(cb){
   reader.readAsText(file);
 }
 
-// ===== HELPERS =====
-
 function getClosed(start,end){
   return rows.filter(r=>{
     let d=new Date(r["Close date"]);
@@ -128,8 +207,6 @@ function getFloating(){
 function getFirstClose(onboard){
   return rows.find(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
 }
-
-// ===== MAIN =====
 
 function run(type){
 
@@ -157,11 +234,13 @@ let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Account Details</div>
-Balance: ${balance.toFixed(2)}<br>
-Closed Profits: ${closedTotal.toFixed(2)}<br>
-Floating P/L: ${floating.toFixed(2)}<br>
-Growth: ${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})<br>
-Track Record: ${track} days
+<div class="data-grid">
+  <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})</div></div>
+  <div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
+</div>
 `;
 
 // ===== TIMEFRAME =====
@@ -172,21 +251,16 @@ if(type==="weekly"){
   document.getElementById("weeklyRange").style.display="block";
   start=new Date(document.getElementById("weekStart").value);
   end=new Date(document.getElementById("weekEnd").value);
-
   title=`Account Performance (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
 }
 else{
   document.getElementById("weeklyRange").style.display="none";
-
   let days=Number(type);
   start=firstDate;
   end=new Date(firstDate);
   end.setDate(end.getDate()+days);
-
   title=`Account Performance (${days} Days)`;
 }
-
-// ===== BREAKDOWN =====
 
 let closed=getClosed(start,end);
 let deposits=getDeposits(start,end);
@@ -195,10 +269,12 @@ let growthTF=initialDeposit?((bal-initialDeposit)/initialDeposit)*100:0;
 
 document.getElementById("breakdown").innerHTML=`
 <div class="section-title">${title}</div>
-Balance: ${bal.toFixed(2)}<br>
-Closed Profits: ${closed.toFixed(2)}<br>
-Floating P/L: ${floating.toFixed(2)}<br>
-Growth: ${growthTF.toFixed(2)}%
+<div class="data-grid">
+  <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
+  <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
+</div>
 `;
 
 });
