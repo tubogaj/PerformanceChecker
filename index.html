@@ -201,55 +201,64 @@ document.getElementById("overview").innerHTML=`
 
 // ===== TIMEFRAME =====
 let start,end,title;
+let bal;
 
 if(type==="weekly"){
 document.getElementById("weeklyRange").style.display="block";
 start=new Date(document.getElementById("weekStart").value);
 end=new Date(document.getElementById("weekEnd").value);
 title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
+
+// weekly uses running balance
+bal = balance;
+
 }else{
+
 document.getElementById("weeklyRange").style.display="none";
 let d=Number(type);
-start=firstDate;
+
+start=onboard;
 end=new Date(firstDate);
 end.setDate(end.getDate()+d);
-title=`${d} Days`;
-}
 
-// PERFORMANCE
-let closed=sum(filter("Closed position",start,end));
+title=`${d} Days`;
+
+// CORRECT LOGIC
 let dep=sum(filter("Deposit",start,end));
 let wd=sum(filter("Withdrawal",start,end));
+let closed=sum(filter("Closed position",start,end));
 
-let base = depositsAll + dep;
-let bal = base - wd + closed;
-let growthPctTF = base ? (closed/base)*100 : 0;
+bal = dep - wd + closed;
+}
 
-// FUNDING
+// common metrics
+let closedTF=sum(filter("Closed position",start,end));
+let growthPctTF=depositsAll?(closedTF/depositsAll)*100:0;
+
+// funding
 let fundingRows=rows.filter(r=>{
-  let d=new Date(r["Close date"]);
-  return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
+let d=new Date(r["Close date"]);
+return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
 });
 
-let fundingList = fundingRows.map(r=>{
-  let amt=Number(r["Net profit"])||0;
-  let label=amt>=0?"Deposit":"Withdrawal";
-  return `${r["Close date"]} → ${label} (${amt})`;
+let fundingList=fundingRows.map(r=>{
+let amt=Number(r["Net profit"])||0;
+let label=amt>=0?"Deposit":"Withdrawal";
+return `${r["Close date"]} → ${label} (${amt})`;
 });
 
 document.getElementById("breakdown").innerHTML=`
 <div class="section-title">Account Performance (${title})</div>
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTF.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}% (${closed.toFixed(2)})</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}%</div></div>
 </div>
 
 ${fundingList.length ? `<div class="funding"><b>Funding:</b><br>${fundingList.join("<br>")}</div>` : ""}
 `;
 
-// GHL
 ghlText = `
 Software: ${software}
 
@@ -257,15 +266,15 @@ Software: ${software}
 Balance: ${balance.toFixed(2)}
 Closed Profits: ${closedTotal.toFixed(2)}
 Floating: ${floating.toFixed(2)}
-Growth: ${growthPct.toFixed(2)}% (${closedTotal.toFixed(2)})
+Growth: ${growthPct.toFixed(2)}%
 Track Record: ${track} days
 1st Trade Closed: ${firstDate.toLocaleDateString()}
 
 --- PERFORMANCE (${title}) ---
 Balance: ${bal.toFixed(2)}
-Closed Profits: ${closed.toFixed(2)}
+Closed Profits: ${closedTF.toFixed(2)}
 Floating: ${floating.toFixed(2)}
-Growth: ${growthPctTF.toFixed(2)}% (${closed.toFixed(2)})
+Growth: ${growthPctTF.toFixed(2)}%
 
 ${fundingList.length ? "Funding:\n"+fundingList.join("\n") : ""}
 `;
