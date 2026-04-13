@@ -1,66 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Account Performance Checker</title>
 
 <style>
 body {
-  font-family: 'Segoe UI', Arial;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
-  color: #fff;
-  padding: 40px;
+  font-family: 'Segoe UI';
+  background: linear-gradient(135deg,#0f172a,#1e293b);
+  color:#fff;
+  padding:40px;
 }
-.container { max-width: 1200px; margin: auto; }
-
+.container { max-width:1100px;margin:auto; }
 .glass {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(15px);
-  border-radius: 16px;
-  padding: 25px;
-  margin-bottom: 20px;
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(15px);
+  padding:25px;
+  border-radius:14px;
+  margin-bottom:20px;
 }
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo { height: 90px; }
+.header { display:flex;justify-content:space-between;align-items:center; }
+.logo { height:90px; }
 
 input {
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255,255,255,0.1);
-  color: #fff;
-  margin: 5px;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+  background:rgba(255,255,255,0.1);
+  color:#fff;
+  margin:5px;
 }
-
 button {
-  padding: 10px 18px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  cursor: pointer;
+  padding:10px 18px;
+  border:none;
+  border-radius:8px;
+  background:rgba(255,255,255,0.15);
+  color:#fff;
+  cursor:pointer;
 }
-button:hover { background: rgba(255,255,255,0.25); }
+button:hover { background:rgba(255,255,255,0.3); }
 
-.section-title {
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th, td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-}
+.section-title { font-weight:600;margin-bottom:10px; }
 </style>
 </head>
 
@@ -74,39 +54,38 @@ th, td {
 </div>
 
 <div class="glass">
-  <input type="file" id="fileInput" accept=".csv"><br>
-  <input type="text" id="name" placeholder="Client Name">
-  <input type="text" id="software" placeholder="Software">
-  <input type="date" id="onboarding">
+<input type="file" id="fileInput" accept=".csv"><br>
+<input type="text" id="name" placeholder="Client Name">
+<input type="text" id="software" placeholder="Software">
+<input type="date" id="onboarding">
 
-  <div id="weeklyRange" style="display:none;">
-    Start: <input type="date" id="weekStart">
-    End: <input type="date" id="weekEnd">
-  </div>
+<div id="weeklyRange" style="display:none;">
+Start: <input type="date" id="weekStart">
+End: <input type="date" id="weekEnd">
+</div>
 
-  <br>
-  <button onclick="run('weekly')">Weekly</button>
-  <button onclick="run('30')">30 Days</button>
-  <button onclick="run('60')">60 Days</button>
-  <button onclick="run('90')">90 Days</button>
+<br>
+<button onclick="run('weekly')">Weekly</button>
+<button onclick="run('30')">30 Days</button>
+<button onclick="run('60')">60 Days</button>
+<button onclick="run('90')">90 Days</button>
 </div>
 
 <div id="overview" class="glass"></div>
 <div id="breakdown" class="glass"></div>
-<div id="monthly" class="glass"></div>
 
 </div>
 
 <script>
 
-let rows = [];
+let rows=[];
 
 function parseCSV(text){
-  const lines = text.split("\n").filter(l=>l.trim());
-  const headers = lines[1].split(",");
+  const lines=text.split("\n").filter(l=>l.trim());
+  const headers=lines[1].split(",");
 
   return lines.slice(2).map(line=>{
-    const values = line.split(",");
+    const values=line.split(",");
     let obj={};
     headers.forEach((h,i)=>obj[h.trim()]=values[i]?.trim());
     return obj;
@@ -119,157 +98,108 @@ function loadFile(cb){
 
   const reader=new FileReader();
   reader.onload=e=>{
-    rows=parseCSV(e.target.result).sort((a,b)=> new Date(a["Close date"]) - new Date(b["Close date"]));
+    rows=parseCSV(e.target.result);
     cb();
   };
   reader.readAsText(file);
 }
 
-// ===== BUILD BALANCE ENGINE =====
-function getBalanceAt(date, onboard){
+// ===== HELPERS =====
 
-  let balance = 0;
-
-  rows.forEach(r=>{
+function getClosed(start,end){
+  return rows.filter(r=>{
     let d=new Date(r["Close date"]);
-    if(d<onboard || d>date) return;
-
-    let p=Number(r["Net profit"])||0;
-    let type=r.Type?.toLowerCase()||"";
-
-    if(type.includes("deposit")) balance+=p;
-    else if(type.includes("withdraw")) balance+=p; // negative already
-    else if(r.Type!=="Open position") balance+=p;
-  });
-
-  return balance;
+    return r.Type==="Closed position" && d>=start && d<=end;
+  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
-function getClosedProfit(start,end){
-  let total=0;
-
-  rows.forEach(r=>{
+function getDeposits(start,end){
+  return rows.filter(r=>{
     let d=new Date(r["Close date"]);
-    if(d>=start && d<=end && r.Type!=="Open position"){
-      let type=r.Type?.toLowerCase()||"";
-      if(!type.includes("deposit") && !type.includes("withdraw")){
-        total += Number(r["Net profit"])||0;
-      }
-    }
-  });
-
-  return total;
+    return r.Type==="Deposit" && d>=start && d<=end;
+  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
 function getFloating(){
   return rows.filter(r=>r.Type==="Open position")
-             .reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
+    .reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
 function getFirstClose(onboard){
-  return rows.find(r => new Date(r["Close date"]) >= onboard && r.Type !== "Open position");
-}
-
-// ===== MONTHLY =====
-function calcMonthly(onboard){
-
-  let months={};
-
-  rows.forEach(r=>{
-    let d=new Date(r["Close date"]);
-    if(d<onboard || r.Type==="Open position") return;
-
-    let key=`${d.getFullYear()}-${d.getMonth()+1}`;
-
-    if(!months[key]){
-      let start = getBalanceAt(new Date(d.getFullYear(), d.getMonth(), 1), onboard);
-      let end = getBalanceAt(new Date(d.getFullYear(), d.getMonth()+1, 0), onboard);
-
-      let profit = end - start;
-      let pct = start ? (profit/start)*100 : 0;
-
-      months[key]={start,end,profit,pct};
-    }
-  });
-
-  let html=`<div class="section-title">Monthly Performance</div>
-  <table><tr><th>Month</th><th>Start</th><th>End</th><th>Profit</th><th>%</th></tr>`;
-
-  Object.keys(months).forEach(k=>{
-    let m=months[k];
-    html+=`<tr>
-      <td>${k}</td>
-      <td>${m.start.toFixed(2)}</td>
-      <td>${m.end.toFixed(2)}</td>
-      <td>${m.profit.toFixed(2)}</td>
-      <td>${m.pct.toFixed(2)}%</td>
-    </tr>`;
-  });
-
-  html+=`</table>`;
-  document.getElementById("monthly").innerHTML=html;
+  return rows.find(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
 }
 
 // ===== MAIN =====
+
 function run(type){
 
 loadFile(()=>{
 
-  const onboard=new Date(document.getElementById("onboarding").value);
-  const first=getFirstClose(onboard);
-  if(!first) return alert("No trades");
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return alert("No closed trades found");
 
-  let firstDate=new Date(first["Close date"]);
-  let today=new Date();
+let firstDate=new Date(first["Close date"]);
+let today=new Date();
 
-  // ===== OVERVIEW =====
-  let currentBalance = getBalanceAt(today,onboard);
-  let initialBalance = getBalanceAt(firstDate,onboard);
-  let closedTotal = getClosedProfit(onboard,today);
-  let floating = getFloating();
-  let growth = initialBalance ? ((currentBalance-initialBalance)/initialBalance)*100:0;
-  let track = Math.floor((today-firstDate)/(1000*60*60*24));
+// ===== ACCOUNT DETAILS =====
 
-  document.getElementById("overview").innerHTML=`
-    <div class="section-title">Account Overview</div>
-    Balance: ${currentBalance.toFixed(2)}<br>
-    Closed Profits: ${closedTotal.toFixed(2)}<br>
-    Floating P/L: ${floating.toFixed(2)}<br>
-    Growth: ${growth.toFixed(2)}%<br>
-    Track Record: ${track} days
-  `;
+let closedTotal=getClosed(onboard,today);
+let depositTotal=getDeposits(new Date("2000-01-01"),today);
+let balance=depositTotal - closedTotal;
+let floating=getFloating();
 
-  // ===== TIMEFRAME =====
-  let start,end;
+let initialDeposit=getDeposits(new Date("2000-01-01"),onboard);
+let growthPct=initialDeposit?((balance-initialDeposit)/initialDeposit)*100:0;
+let growthVal=balance-initialDeposit;
 
-  if(type==="weekly"){
-    document.getElementById("weeklyRange").style.display="block";
-    start=new Date(document.getElementById("weekStart").value);
-    end=new Date(document.getElementById("weekEnd").value);
-  } else {
-    document.getElementById("weeklyRange").style.display="none";
-  }
+let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
-  if(type==="30"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+30); }
-  if(type==="60"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+60); }
-  if(type==="90"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+90); }
+document.getElementById("overview").innerHTML=`
+<div class="section-title">Account Details</div>
+Balance: ${balance.toFixed(2)}<br>
+Closed Profits: ${closedTotal.toFixed(2)}<br>
+Floating P/L: ${floating.toFixed(2)}<br>
+Growth: ${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})<br>
+Track Record: ${track} days
+`;
 
-  let startBal = getBalanceAt(start,onboard);
-  let endBal = getBalanceAt(end,onboard);
-  let closed = getClosedProfit(start,end);
-  let growthTF = startBal ? ((endBal-startBal)/startBal)*100:0;
-  let trackTF = Math.floor((end-start)/(1000*60*60*24));
+// ===== TIMEFRAME =====
 
-  document.getElementById("breakdown").innerHTML=`
-    <div class="section-title">Breakdown (${type})</div>
-    Balance: ${endBal.toFixed(2)}<br>
-    Closed Profits: ${closed.toFixed(2)}<br>
-    Floating P/L: ${floating.toFixed(2)}<br>
-    Growth: ${growthTF.toFixed(2)}%<br>
-    Track Record: ${trackTF} days
-  `;
+let start,end,title="";
 
-  calcMonthly(onboard);
+if(type==="weekly"){
+  document.getElementById("weeklyRange").style.display="block";
+  start=new Date(document.getElementById("weekStart").value);
+  end=new Date(document.getElementById("weekEnd").value);
+
+  title=`Account Performance (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
+}
+else{
+  document.getElementById("weeklyRange").style.display="none";
+
+  let days=Number(type);
+  start=firstDate;
+  end=new Date(firstDate);
+  end.setDate(end.getDate()+days);
+
+  title=`Account Performance (${days} Days)`;
+}
+
+// ===== BREAKDOWN =====
+
+let closed=getClosed(start,end);
+let deposits=getDeposits(start,end);
+let bal=deposits - closed;
+let growthTF=initialDeposit?((bal-initialDeposit)/initialDeposit)*100:0;
+
+document.getElementById("breakdown").innerHTML=`
+<div class="section-title">${title}</div>
+Balance: ${bal.toFixed(2)}<br>
+Closed Profits: ${closed.toFixed(2)}<br>
+Floating P/L: ${floating.toFixed(2)}<br>
+Growth: ${growthTF.toFixed(2)}%
+`;
 
 });
 
