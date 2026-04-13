@@ -2,36 +2,63 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Conan | Account Performance Checker</title>
+<title>Account Performance Checker</title>
 
 <style>
 body {
-  font-family: Arial;
-  background: #ffffff;
-  color: #000;
-  padding: 30px;
+  font-family: 'Segoe UI', Arial;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  padding: 40px;
 }
 .container {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: auto;
 }
-h1 {
-  text-align: center;
+.glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  padding: 25px;
+  border: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 20px;
 }
-input, button {
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo { height: 90px; }
+.inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+  gap: 12px;
+}
+input {
   padding: 10px;
-  margin: 5px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
 }
 button {
-  background: #000;
-  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
   border: none;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
   cursor: pointer;
 }
-.section {
+button:hover { background: rgba(255,255,255,0.25); }
+.buttons { margin-top: 15px; display: flex; gap: 10px; }
+table {
+  width: 100%;
   margin-top: 20px;
-  padding: 20px;
-  border: 1px solid #000;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
 }
 </style>
 </head>
@@ -39,30 +66,36 @@ button {
 <body>
 
 <div class="container">
-<h1>Conan<br>Account Performance Checker</h1>
 
-<div>
+<div class="glass header">
+  <h2>Account Performance Checker</h2>
+  <img src="logo.png" class="logo">
+</div>
+
+<div class="glass">
   <input type="file" id="fileInput" accept=".csv"><br><br>
 
-  Name:<br>
-  <input type="text" id="name"><br>
+  <div class="inputs">
+    <input type="text" id="name" placeholder="Client Name">
+    <input type="text" id="software" placeholder="Software">
+    <input type="date" id="onboarding">
+  </div>
 
-  Software:<br>
-  <input type="text" id="software"><br>
+  <div id="weeklyRange" style="display:none; margin-top:10px;">
+    Start: <input type="date" id="weekStart">
+    End: <input type="date" id="weekEnd">
+  </div>
 
-  Onboarding Date:<br>
-  <input type="date" id="onboarding"><br>
+  <div class="buttons">
+    <button onclick="run('weekly')">Weekly</button>
+    <button onclick="run('30')">30 Days</button>
+    <button onclick="run('60')">60 Days</button>
+    <button onclick="run('90')">90 Days</button>
+  </div>
 </div>
 
-<div>
-  <button onclick="run('weekly')">Weekly</button>
-  <button onclick="run('30')">30 Days</button>
-  <button onclick="run('60')">60 Days</button>
-  <button onclick="run('90')">90 Days</button>
-  <button onclick="run('outlook')">Outlook</button>
-</div>
-
-<div id="result" class="section"></div>
+<div id="result" class="glass"></div>
+<div id="monthlyTable" class="glass"></div>
 
 </div>
 
@@ -94,170 +127,162 @@ function loadFile(callback) {
   reader.readAsText(file);
 }
 
-function calcData(start, end, onboard) {
+// ===== MONTHLY TRUE TRACKING + DRAWNDOWN + WINRATE =====
+function calcMonthly(onboard) {
 
-  let initialDeposit = 0;
-  let closedProfit = 0;
-  let floating = 0;
-  let firstClose = null;
-  let funding = [];
+  let balance = 0;
+  let months = {};
 
-  rows.forEach(r => {
+  let sorted = [...rows].sort((a,b)=> new Date(a["Close date"]) - new Date(b["Close date"]));
 
-    let date = new Date(r["Close date"]);
+  sorted.forEach(r => {
+
+    let d = new Date(r["Close date"]);
+    if (isNaN(d) || d < onboard || r.Type === "Open position") return;
+
     let profit = Number(r["Net profit"]) || 0;
-    let type = r.Type?.toLowerCase() || "";
+    let key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 
-    // INITIAL DEPOSIT (from onboarding)
-    if (type.includes("deposit") && date >= onboard) {
-      initialDeposit += profit;
+    if (!months[key]) {
+      months[key] = {
+        start: balance,
+        end: 0,
+        peak: balance,
+        maxDD: 0,
+        wins: 0,
+        trades: 0
+      };
     }
 
-    // FUNDING (ONLY WITHIN SELECTED PERIOD)
-    if ((type.includes("deposit") || type.includes("withdraw")) &&
-        date >= start && date <= end) {
-      funding.push(`${r["Close date"]} → ${profit}`);
-    }
+    balance += profit;
 
-    // CLOSED TRADES
-    if (r.Type !== "Open position" && r["Close date"]) {
+    let m = months[key];
 
-      if (!firstClose && date >= onboard) {
-        firstClose = r["Close date"];
-      }
+    // TRACK PEAK & DD
+    if (balance > m.peak) m.peak = balance;
 
-      if (date >= start && date <= end) {
-        closedProfit += profit;
-      }
-    }
+    let dd = ((m.peak - balance) / m.peak) * 100;
+    if (dd > m.maxDD) m.maxDD = dd;
 
-    // FLOATING
-    if (r.Type === "Open position") {
-      floating += profit;
-    }
+    // WIN RATE
+    m.trades++;
+    if (profit > 0) m.wins++;
+
+    m.end = balance;
 
   });
 
-  // TOTAL RETURN (ONBOARDING → END DATE)
-  let totalProfitFromStart = 0;
+  let html = `
+  <h3>Monthly Performance</h3>
+  <table>
+  <tr>
+    <th>Month</th>
+    <th>Start</th>
+    <th>End</th>
+    <th>Profit</th>
+    <th>Growth %</th>
+    <th>Max DD %</th>
+    <th>Win Rate %</th>
+  </tr>`;
 
-  rows.forEach(r => {
-    let date = new Date(r["Close date"]);
-    let profit = Number(r["Net profit"]) || 0;
+  Object.keys(months).forEach(k => {
 
-    if (date >= onboard && date <= end && r.Type !== "Open position") {
-      totalProfitFromStart += profit;
-    }
+    let m = months[k];
+    let profit = m.end - m.start;
+    let pct = m.start ? (profit / m.start) * 100 : 0;
+    let winrate = m.trades ? (m.wins / m.trades) * 100 : 0;
+
+    html += `
+    <tr>
+      <td>${k}</td>
+      <td>${m.start.toFixed(2)}</td>
+      <td>${m.end.toFixed(2)}</td>
+      <td>${profit.toFixed(2)}</td>
+      <td>${pct.toFixed(2)}%</td>
+      <td>${m.maxDD.toFixed(2)}%</td>
+      <td>${winrate.toFixed(2)}%</td>
+    </tr>`;
   });
 
-  let percent = initialDeposit
-    ? (totalProfitFromStart / initialDeposit) * 100
-    : 0;
-
-  return {
-    initialDeposit,
-    totalReturn: totalProfitFromStart,
-    percent,
-    closedProfit,
-    floating,
-    firstClose,
-    funding
-  };
+  html += `</table>`;
+  document.getElementById("monthlyTable").innerHTML = html;
 }
 
-function run(type) {
+// ===== CORE CALC =====
+function calcData(start, end, onboard) {
 
-  loadFile(() => {
+  let closed = 0, floating = 0, deposit = 0, balance = 0, funding=[];
 
-    const name = document.getElementById("name").value;
-    const software = document.getElementById("software").value;
-    const onboard = new Date(document.getElementById("onboarding").value);
+  rows.sort((a,b)=> new Date(a["Close date"]) - new Date(b["Close date"]));
 
-    let start, end = new Date();
+  rows.forEach(r=>{
+    let d=new Date(r["Close date"]);
+    let p=Number(r["Net profit"])||0;
+    let t=r.Type?.toLowerCase()||"";
 
-    if (type === "weekly") {
-      start = new Date();
-      start.setDate(start.getDate() - 7);
+    if(d>=onboard && r.Type!=="Open position") balance+=p;
+    if(t.includes("deposit") && d>=onboard) deposit+=p;
+
+    if((t.includes("deposit")||t.includes("withdraw")) && d>=start && d<=end){
+      let label=t.includes("deposit")?"Deposit":"Withdrawal";
+      funding.push(`${r["Close date"]} → ${label} (${p}) → Balance: ${balance.toFixed(2)}`);
     }
 
-    if (type === "30") {
-      start = onboard;
-      end = new Date(onboard);
-      end.setDate(end.getDate() + 30);
-    }
-
-    if (type === "60") {
-      start = onboard;
-      end = new Date(onboard);
-      end.setDate(end.getDate() + 60);
-    }
-
-    if (type === "90") {
-      start = onboard;
-      end = new Date(onboard);
-      end.setDate(end.getDate() + 90);
-    }
-
-    if (type === "outlook") {
-      start = onboard;
-      end = new Date();
-    }
-
-    let data = calcData(start, end, onboard);
-
-    let paragraph = "";
-
-    if (type === "weekly") {
-      paragraph = `Over the past week, the account moved through a short-term cycle of execution, capturing a closed result of ${data.closedProfit.toFixed(2)}. 
-This period reflects the most recent trading behavior, where positions were actively managed and adjusted in response to market conditions. 
-Short-term movement like this highlights whether the system is currently capitalizing on opportunities efficiently or facing temporary pressure from market volatility.`;
-    }
-
-    if (type === "30") {
-      paragraph = `From the onboarding phase through the first 30 days, the account began establishing its trading rhythm. 
-During this period, a total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%) was achieved. 
-This phase often includes early positioning, initial wins, and adjustments, giving a realistic view of how the system behaves when first exposed to live market conditions.`;
-    }
-
-    if (type === "60") {
-      paragraph = `At the 60-day mark, the account shows a clearer pattern of behavior beyond initial execution. 
-With a total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%), this phase reveals whether the system is gaining consistency, maintaining stability, or encountering extended drawdowns. 
-It reflects how well the strategy sustains performance over time.`;
-    }
-
-    if (type === "90") {
-      paragraph = `Across the full 90-day cycle, the account demonstrates its complete performance profile. 
-The total return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%) reflects how the system navigated both favorable and challenging conditions. 
-This longer period gives a more reliable picture of consistency, recovery ability, and overall trading discipline.`;
-    }
-
-    if (type === "outlook") {
-      paragraph = `Looking forward, the account’s trajectory suggests a continuation of its current behavior pattern. 
-Based on accumulated performance, the system demonstrates a balance between growth opportunities and risk exposure. 
-While fluctuations are expected, the data indicates a realistic path of gradual performance development over time.`;
-    }
-
-    let trackDays = Math.floor((new Date() - onboard) / (1000*60*60*24));
-
-    document.getElementById("result").innerHTML = `
-      <b>Name:</b> ${name}<br>
-      <b>Software:</b> ${software}<br>
-      <b>Onboarding Date:</b> ${document.getElementById("onboarding").value}<br><br>
-
-      <b>Total Return:</b> ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%)<br>
-      <b>Track Record:</b> ${trackDays} days<br>
-      <b>Closed Profit (Selected Period):</b> ${data.closedProfit.toFixed(2)}<br>
-      <b>Floating P/L:</b> ${data.floating.toFixed(2)}<br>
-      <b>First Trade Close:</b> ${data.firstClose || "N/A"}<br><br>
-
-      <b>Funding Activity (Selected Period):</b><br>
-      ${data.funding.length ? data.funding.join("<br>") : "None"}<br><br>
-
-      <p>${paragraph}</p>
-    `;
-
+    if(r.Type!=="Open position" && d>=start && d<=end) closed+=p;
+    if(r.Type==="Open position") floating+=p;
   });
 
+  let total=0;
+  rows.forEach(r=>{
+    let d=new Date(r["Close date"]);
+    let p=Number(r["Net profit"])||0;
+    if(d>=onboard && d<=end && r.Type!=="Open position") total+=p;
+  });
+
+  let pct = deposit ? (total/deposit)*100 : 0;
+
+  return { total, pct, closed, floating, funding };
+}
+
+// ===== RUN =====
+function run(type){
+
+  loadFile(()=>{
+
+    const onboard=new Date(document.getElementById("onboarding").value);
+    let start,end;
+
+    if(type==="weekly"){
+      document.getElementById("weeklyRange").style.display="block";
+      start=new Date(document.getElementById("weekStart").value);
+      end=new Date(document.getElementById("weekEnd").value);
+    } else {
+      document.getElementById("weeklyRange").style.display="none";
+    }
+
+    if(type==="30"){ start=onboard; end=new Date(onboard); end.setDate(end.getDate()+30); }
+    if(type==="60"){ start=onboard; end=new Date(onboard); end.setDate(end.getDate()+60); }
+    if(type==="90"){ start=onboard; end=new Date(onboard); end.setDate(end.getDate()+90); }
+
+    let d=calcData(start,end,onboard);
+
+    let state = d.closed>=0 ? "winning" : "drawdown";
+
+    let narrative = state==="winning"
+      ? `The account is currently showing strong performance, maintaining positive returns and demonstrating consistency in execution.`
+      : `The account is undergoing a drawdown phase, reflecting temporary market pressure. This remains within expected trading behavior.`
+
+    document.getElementById("result").innerHTML=`
+      <b>Total Return:</b> ${d.total.toFixed(2)} (${d.pct.toFixed(2)}%)<br>
+      <b>Closed Profit:</b> ${d.closed.toFixed(2)}<br>
+      <b>Floating:</b> ${d.floating.toFixed(2)}<br><br>
+      <b>Funding:</b><br>${d.funding.join("<br>")||"None"}<br><br>
+      <p>${narrative}</p>
+    `;
+
+    calcMonthly(onboard);
+
+  });
 }
 
 </script>
