@@ -1,69 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Performance Checker</title>
+<meta charset="UTF-8" />
+<title>Ridge Capital Solutions | Performance Checker</title>
 
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body {
-    font-family: Arial;
-    background: #ffffff;
-    color: #000;
-    padding: 20px;
+  font-family: Arial;
+  background: #f4f6fb;
+  padding: 30px;
 }
-
-.container { max-width: 1100px; margin: auto; }
-
+.container {
+  max-width: 1100px;
+  margin: auto;
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 10px;
+}
 h1 { text-align: center; }
 
-.card {
-    background: #fff;
-    border: 3px solid #000;
-    padding: 20px;
-    margin-bottom: 20px;
+.controls {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
-input {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 2px solid #000;
+.section {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 8px;
+  background: #eef2ff;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 15px;
+}
+
+.summary-item {
+  background: #ffffff;
+  padding: 14px;
+  border-radius: 6px;
+  font-weight: bold;
 }
 
 button {
-    width: 100%;
-    padding: 12px;
-    background: #000;
-    color: #fff;
-    border: 2px solid #000;
-    font-weight: bold;
-    cursor: pointer;
+  padding: 10px 18px;
+  border: none;
+  background: #1d4ed8;
+  color: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
 }
-
-button:hover { background: #333; }
 
 canvas {
-    background: #fff;
-    border: 3px solid #000;
+  margin-top: 25px;
+  background: #fff;
+  border-radius: 6px;
 }
 
-/* TABLE */
-table {
-    width: 100%;
-    border-collapse: collapse;
+#actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
 }
 
-th, td {
-    border: 2px solid #000;
-    padding: 8px;
-    text-align: center;
+#emailModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
 }
-
-th {
-    background: #000;
-    color: #fff;
+#emailBox {
+  background: white;
+  width: 620px;
+  margin: 8% auto;
+  padding: 20px;
+  border-radius: 8px;
+}
+textarea {
+  width: 100%;
+  height: 300px;
 }
 </style>
 </head>
@@ -71,225 +93,173 @@ th {
 <body>
 
 <div class="container">
+<h1>Ridge Capital Solutions<br>Trading Performance Analyzer</h1>
 
-<h1>Conan - Account Performance Checker</h1>
-
-<div class="card">
-<input id="name" placeholder="Client Name">
-<input id="software" placeholder="Software (R-10, R-50, R-X5, R-S15, R-A10)">
-<input type="file" id="file" accept=".csv">
+<div class="controls">
+  <input type="file" id="fileInput" accept=".csv" />
+  <label>Start Date <input type="date" id="startDate"></label>
+  <label>End Date <input type="date" id="endDate"></label>
+  <button onclick="analyze()">Analyze</button>
 </div>
 
-<div class="card">
-<button onclick="analyze()">Generate Analysis</button>
+<div id="report"></div>
+
+<div id="actions" style="display:none;">
+  <button onclick="downloadPDF()">Download PDF</button>
+  <button onclick="openEmail()">Email Summary</button>
+</div>
 </div>
 
-<div class="card" id="result"></div>
-
-<div class="card">
-<canvas id="chart"></canvas>
+<div id="emailModal">
+<div id="emailBox">
+<h3>Email Summary (Copy & Paste)</h3>
+<textarea id="emailText"></textarea><br><br>
+<button onclick="copyEmail()">Copy</button>
+<button onclick="closeEmail()">Close</button>
 </div>
-
-<div class="card">
-<h3>Monthly Breakdown</h3>
-<table id="monthlyTable">
-<thead>
-<tr>
-<th>Month</th>
-<th>Trades</th>
-<th>Net Profit</th>
-<th>Win Rate</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
-
 </div>
 
 <script>
 
-let trades=[], equity=[], deposit=0, withdrawals=0;
+let chartInstance;
+let uiData = {};
+let balanceDates = [];
+let balanceSeries = [];
+let cumulativeProfitSeries = [];
 
-// CSV LOAD
-document.getElementById('file').addEventListener('change', e=>{
-    let reader=new FileReader();
-    reader.onload=e=>{
-        let rows=e.target.result.split("\n").map(r=>r.split(","));
-        let headers=rows[0].map(h=>h.trim());
-        processCSV(headers, rows.slice(1));
-    };
-    reader.readAsText(e.target.files[0]);
-});
+function analyze() {
 
-// PROCESS
-function processCSV(headers, rows){
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) return alert("Upload CSV");
 
-    trades=[]; equity=[]; deposit=0; withdrawals=0;
-    let bal=0;
+  const start = new Date(document.getElementById("startDate").value);
+  const end = new Date(document.getElementById("endDate").value);
 
-    let t=headers.indexOf("Type");
-    let p=headers.indexOf("Net Profit");
-    let c=headers.indexOf("Close Time");
+  const reader = new FileReader();
+
+  reader.onload = e => {
+
+    const lines = e.target.result.split("\n").filter(l => l.trim());
+    const headers = lines[0].split(",").map(h => h.trim());
+
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(",");
+      let obj = {};
+      headers.forEach((h,i)=>obj[h]=values[i]?.trim());
+      return obj;
+    });
+
+    const netKey = headers.find(h => h.toLowerCase().includes("net"));
+    const closeKey = headers.find(h => h.toLowerCase().includes("close"));
+    const typeKey = headers.find(h => h.toLowerCase().includes("type"));
+
+    let deposits = 0;
+    let balance = 0;
+    let cumProfit = 0;
+    let periodProfit = 0;
+
+    balanceDates=[]; balanceSeries=[]; cumulativeProfitSeries=[];
 
     rows.forEach(r=>{
-        let type=(r[t]||"").toLowerCase();
-        let profit=parseFloat(r[p])||0;
 
-        if(type.includes("deposit")){deposit+=profit; bal+=profit;}
-        else if(type.includes("withdrawal")){withdrawals+=Math.abs(profit); bal+=profit;}
-        else if(r[c]){
-            bal+=profit;
-            let d=new Date(r[c]);
+      const type = (r[typeKey]||"").toLowerCase();
+      const profit = parseFloat(r[netKey]) || 0;
 
-            trades.push({date:d, profit:profit});
-            equity.push({date:d, balance:bal});
+      if(type.includes("deposit")){
+        deposits += profit;
+        balance += profit;
+        return;
+      }
+
+      if(type.includes("withdrawal")){
+        balance += profit;
+        return;
+      }
+
+      if(r[closeKey]){
+        const d = new Date(r[closeKey]);
+
+        balance += profit;
+        cumProfit += profit;
+
+        balanceDates.push(r[closeKey]);
+        balanceSeries.push(balance);
+        cumulativeProfitSeries.push(cumProfit);
+
+        if(d>=start && d<=end){
+          periodProfit += profit;
         }
+      }
+
     });
 
-    alert("CSV Loaded");
-}
+    const performanceStatus = balance >= deposits ? "in profit" : "in drawdown";
 
-// METRICS
-function metrics(){
+    uiData = { balance, deposits, periodProfit };
 
-    let total=trades.reduce((a,b)=>a+b.profit,0);
-    let wins=trades.filter(t=>t.profit>0);
-    let losses=trades.filter(t=>t.profit<0);
+    document.getElementById("report").innerHTML = `
+    <div class="section">
+      <h3>Account Performance Breakdown</h3>
 
-    let winRate=(wins.length/trades.length*100)||0;
-    let avgWin=wins.length?wins.reduce((a,b)=>a+b.profit,0)/wins.length:0;
-    let avgLoss=losses.length?losses.reduce((a,b)=>a+b.profit,0)/losses.length:0;
+      <div class="summary-grid">
+        <div class="summary-item">Deposits<br>$${deposits.toLocaleString()}</div>
+        <div class="summary-item">Balance<br>$${balance.toLocaleString()}</div>
+        <div class="summary-item">Closed P/L (Period)<br>$${periodProfit.toLocaleString()}</div>
+        <div class="summary-item">Status<br>${performanceStatus}</div>
+      </div>
 
-    let peak=0,maxDD=0;
+      <p style="margin-top:15px;">
+        The account generated <b>$${periodProfit.toLocaleString()}</b> during the selected period.
+        Current balance stands at <b>$${balance.toLocaleString()}</b>, relative to total deposits of
+        <b>$${deposits.toLocaleString()}</b>, placing the account currently <b>${performanceStatus}</b>.
+      </p>
 
-    equity.forEach(p=>{
-        if(p.balance>peak) peak=p.balance;
-        let dd=(peak-p.balance)/peak*100;
-        if(dd>maxDD) maxDD=dd;
+      <canvas id="balanceChart"></canvas>
+    </div>
+    `;
+
+    if(chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(document.getElementById("balanceChart"),{
+      type:"line",
+      data:{
+        labels:balanceDates,
+        datasets:[
+          {label:"Balance",data:balanceSeries,borderWidth:2},
+          {label:"Cumulative Profit",data:cumulativeProfitSeries,borderWidth:2}
+        ]
+      }
     });
 
-    return {
-        total:total.toFixed(2),
-        winRate:winRate.toFixed(2),
-        avgWin:avgWin.toFixed(2),
-        avgLoss:avgLoss.toFixed(2),
-        maxDD:maxDD.toFixed(2)
-    };
+    document.getElementById("actions").style.display="flex";
+
+  };
+
+  reader.readAsText(file);
 }
 
-// MONTHLY TABLE
-function buildMonthlyTable(){
-
-    let map={};
-
-    trades.forEach(t=>{
-        let key=t.date.getFullYear()+"-"+(t.date.getMonth()+1);
-
-        if(!map[key]){
-            map[key]={profit:0,trades:0,wins:0};
-        }
-
-        map[key].profit+=t.profit;
-        map[key].trades++;
-        if(t.profit>0) map[key].wins++;
-    });
-
-    let tbody=document.querySelector("#monthlyTable tbody");
-    tbody.innerHTML="";
-
-    Object.keys(map).sort().forEach(m=>{
-        let data=map[m];
-        let winRate=(data.wins/data.trades*100)||0;
-
-        let row=`
-        <tr>
-        <td>${m}</td>
-        <td>${data.trades}</td>
-        <td>$${data.profit.toFixed(2)}</td>
-        <td>${winRate.toFixed(2)}%</td>
-        </tr>
-        `;
-        tbody.innerHTML+=row;
-    });
+// PDF
+function downloadPDF(){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+  pdf.text("Performance Report",20,20);
+  pdf.text(`Balance: $${uiData.balance}`,20,30);
+  pdf.text(`Period Profit: $${uiData.periodProfit}`,20,40);
+  pdf.save("report.pdf");
 }
 
-// STRATEGY
-function behavior(s){
-    s=s.toUpperCase();
-
-    if(s.includes("R-X5")) return "Low-risk system, gradual growth.";
-    if(s.includes("R-X25")) return "Structured compounding system.";
-    if(s.includes("R-C30")) return "High volatility crypto behavior.";
-    if(s.includes("R-50")) return "Diversified multi-strategy.";
-    if(s.includes("R-10")) return "High-frequency execution.";
-    if(s.includes("R-S15")) return "Intraday news-driven spikes.";
-    if(s.includes("R-A10")) return "Reversal system with low drawdown.";
-
-    return "Adaptive system.";
+// EMAIL
+function openEmail(){
+  document.getElementById("emailText").value =
+`Account generated $${uiData.periodProfit} during the selected period.
+Current balance is $${uiData.balance}.`;
+  document.getElementById("emailModal").style.display="block";
 }
 
-// AM REPORT
-function report(software,m){
-
-    return `
---- PERFORMANCE ---
-${m.total>0?"Profitable":"Drawdown phase"}
-
---- RISK ---
-${m.maxDD>20?"High risk":"Moderate/Controlled risk"}
-
---- EXECUTION ---
-Win Rate: ${m.winRate}%
-
---- RISK/REWARD ---
-${parseFloat(m.avgWin)>Math.abs(parseFloat(m.avgLoss))?"Positive RR":"Negative RR"}
-
---- STRATEGY ---
-${behavior(software)}
-`;
+function copyEmail(){
+  navigator.clipboard.writeText(document.getElementById("emailText").value);
 }
-
-// CHART
-function chart(){
-
-    new Chart(document.getElementById('chart'),{
-        type:'line',
-        data:{
-            labels:equity.map(e=>e.date.toLocaleDateString()),
-            datasets:[{
-                label:'Equity',
-                data:equity.map(e=>e.balance),
-                borderWidth:2
-            }]
-        }
-    });
-}
-
-// MAIN
-function analyze(){
-
-    let name=document.getElementById("name").value;
-    let software=document.getElementById("software").value;
-
-    let m=metrics();
-
-    document.getElementById("result").innerText=`
-Client: ${name}
-Software: ${software}
-
---- METRICS ---
-Total Net Profit: $${m.total}
-Win Rate: ${m.winRate}%
-Avg Win: $${m.avgWin}
-Avg Loss: $${m.avgLoss}
-Max Drawdown: ${m.maxDD}%
-
-${report(software,m)}
-`;
-
-    chart();
-    buildMonthlyTable();
+function closeEmail(){
+  document.getElementById("emailModal").style.display="none";
 }
 
 </script>
