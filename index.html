@@ -2,264 +2,232 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Ridge Capital Solutions | Performance Checker</title>
-
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>Conan | Account Performance Checker</title>
 
 <style>
 body {
   font-family: Arial;
-  background: #f4f6fb;
+  background: #ffffff;
+  color: #000;
   padding: 30px;
 }
 .container {
   max-width: 1100px;
   margin: auto;
-  background: #ffffff;
-  padding: 30px;
-  border-radius: 10px;
 }
-h1 { text-align: center; }
+h1 {
+  text-align: center;
+}
 
-.controls {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
+input, button {
+  padding: 10px;
+  margin: 5px;
+}
+
+button {
+  background: #000;
+  color: #fff;
+  border: none;
+  cursor: pointer;
 }
 
 .section {
   margin-top: 20px;
   padding: 20px;
-  border-radius: 8px;
-  background: #eef2ff;
+  border: 1px solid #000;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 15px;
-}
-
-.summary-item {
-  background: #ffffff;
-  padding: 14px;
-  border-radius: 6px;
-  font-weight: bold;
-}
-
-button {
-  padding: 10px 18px;
-  border: none;
-  background: #1d4ed8;
-  color: #ffffff;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-canvas {
-  margin-top: 25px;
-  background: #fff;
-  border-radius: 6px;
-}
-
-#actions {
-  margin-top: 20px;
-  display: flex;
-  gap: 12px;
-}
-
-#emailModal {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-}
-#emailBox {
-  background: white;
-  width: 620px;
-  margin: 8% auto;
-  padding: 20px;
-  border-radius: 8px;
-}
-textarea {
-  width: 100%;
-  height: 300px;
-}
 </style>
 </head>
 
 <body>
 
 <div class="container">
-<h1>Ridge Capital Solutions<br>Trading Performance Analyzer</h1>
+<h1>Conan<br>Account Performance Checker</h1>
 
-<div class="controls">
-  <input type="file" id="fileInput" accept=".csv" />
-  <label>Start Date <input type="date" id="startDate"></label>
-  <label>End Date <input type="date" id="endDate"></label>
-  <button onclick="analyze()">Analyze</button>
+<!-- INPUTS -->
+<div>
+  <input type="file" id="fileInput" accept=".csv">
+  <br><br>
+
+  Name:<br>
+  <input type="text" id="name"><br>
+
+  Software:<br>
+  <input type="text" id="software"><br>
+
+  Onboarding Date:<br>
+  <input type="date" id="onboarding"><br>
 </div>
 
-<div id="report"></div>
+<!-- BUTTONS -->
+<div>
+  <button onclick="run('weekly')">Weekly</button>
+  <button onclick="run('30')">30 Days</button>
+  <button onclick="run('60')">60 Days</button>
+  <button onclick="run('90')">90 Days</button>
+  <button onclick="run('outlook')">Outlook</button>
+</div>
 
-<div id="actions" style="display:none;">
-  <button onclick="downloadPDF()">Download PDF</button>
-  <button onclick="openEmail()">Email Summary</button>
-</div>
-</div>
+<!-- RESULT -->
+<div id="result" class="section"></div>
 
-<div id="emailModal">
-<div id="emailBox">
-<h3>Email Summary (Copy & Paste)</h3>
-<textarea id="emailText"></textarea><br><br>
-<button onclick="copyEmail()">Copy</button>
-<button onclick="closeEmail()">Close</button>
-</div>
 </div>
 
 <script>
 
-let chartInstance;
-let uiData = {};
-let balanceDates = [];
-let balanceSeries = [];
-let cumulativeProfitSeries = [];
+let rows = [];
 
-function analyze() {
+function parseCSV(text) {
+  const lines = text.split("\n").filter(l => l.trim());
+  const headers = lines[1].split(",");
 
+  return lines.slice(2).map(line => {
+    const values = line.split(",");
+    let obj = {};
+    headers.forEach((h,i)=>obj[h.trim()] = values[i]?.trim());
+    return obj;
+  });
+}
+
+function loadFile(callback) {
   const file = document.getElementById("fileInput").files[0];
   if (!file) return alert("Upload CSV");
 
-  const start = new Date(document.getElementById("startDate").value);
-  const end = new Date(document.getElementById("endDate").value);
-
   const reader = new FileReader();
-
   reader.onload = e => {
-
-    const lines = e.target.result.split("\n").filter(l => l.trim());
-    const headers = lines[0].split(",").map(h => h.trim());
-
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(",");
-      let obj = {};
-      headers.forEach((h,i)=>obj[h]=values[i]?.trim());
-      return obj;
-    });
-
-    const netKey = headers.find(h => h.toLowerCase().includes("net"));
-    const closeKey = headers.find(h => h.toLowerCase().includes("close"));
-    const typeKey = headers.find(h => h.toLowerCase().includes("type"));
-
-    let deposits = 0;
-    let balance = 0;
-    let cumProfit = 0;
-    let periodProfit = 0;
-
-    balanceDates=[]; balanceSeries=[]; cumulativeProfitSeries=[];
-
-    rows.forEach(r=>{
-
-      const type = (r[typeKey]||"").toLowerCase();
-      const profit = parseFloat(r[netKey]) || 0;
-
-      if(type.includes("deposit")){
-        deposits += profit;
-        balance += profit;
-        return;
-      }
-
-      if(type.includes("withdrawal")){
-        balance += profit;
-        return;
-      }
-
-      if(r[closeKey]){
-        const d = new Date(r[closeKey]);
-
-        balance += profit;
-        cumProfit += profit;
-
-        balanceDates.push(r[closeKey]);
-        balanceSeries.push(balance);
-        cumulativeProfitSeries.push(cumProfit);
-
-        if(d>=start && d<=end){
-          periodProfit += profit;
-        }
-      }
-
-    });
-
-    const performanceStatus = balance >= deposits ? "in profit" : "in drawdown";
-
-    uiData = { balance, deposits, periodProfit };
-
-    document.getElementById("report").innerHTML = `
-    <div class="section">
-      <h3>Account Performance Breakdown</h3>
-
-      <div class="summary-grid">
-        <div class="summary-item">Deposits<br>$${deposits.toLocaleString()}</div>
-        <div class="summary-item">Balance<br>$${balance.toLocaleString()}</div>
-        <div class="summary-item">Closed P/L (Period)<br>$${periodProfit.toLocaleString()}</div>
-        <div class="summary-item">Status<br>${performanceStatus}</div>
-      </div>
-
-      <p style="margin-top:15px;">
-        The account generated <b>$${periodProfit.toLocaleString()}</b> during the selected period.
-        Current balance stands at <b>$${balance.toLocaleString()}</b>, relative to total deposits of
-        <b>$${deposits.toLocaleString()}</b>, placing the account currently <b>${performanceStatus}</b>.
-      </p>
-
-      <canvas id="balanceChart"></canvas>
-    </div>
-    `;
-
-    if(chartInstance) chartInstance.destroy();
-    chartInstance = new Chart(document.getElementById("balanceChart"),{
-      type:"line",
-      data:{
-        labels:balanceDates,
-        datasets:[
-          {label:"Balance",data:balanceSeries,borderWidth:2},
-          {label:"Cumulative Profit",data:cumulativeProfitSeries,borderWidth:2}
-        ]
-      }
-    });
-
-    document.getElementById("actions").style.display="flex";
-
+    rows = parseCSV(e.target.result);
+    callback();
   };
-
   reader.readAsText(file);
 }
 
-// PDF
-function downloadPDF(){
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  pdf.text("Performance Report",20,20);
-  pdf.text(`Balance: $${uiData.balance}`,20,30);
-  pdf.text(`Period Profit: $${uiData.periodProfit}`,20,40);
-  pdf.save("report.pdf");
+function calcData(start, end) {
+
+  let deposit = 0;
+  let closedProfit = 0;
+  let floating = 0;
+  let firstClose = null;
+  let funding = [];
+
+  rows.forEach(r => {
+
+    if (r.Type?.toLowerCase().includes("deposit") || r.Type?.toLowerCase().includes("withdraw")) {
+      funding.push(`${r["Close date"]} → ${r["Net profit"]}`);
+      deposit += Number(r["Net profit"]) || 0;
+    }
+
+    if (r.Type !== "Open position" && r["Close date"]) {
+      let d = new Date(r["Close date"]);
+      let profit = Number(r["Net profit"]) || 0;
+
+      if (!firstClose) firstClose = r["Close date"];
+
+      if (!start || (d >= start && d <= end)) {
+        closedProfit += profit;
+      }
+    }
+
+    if (r.Type === "Open position") {
+      floating += Number(r["Net profit"]) || 0;
+    }
+
+  });
+
+  let balance = deposit + closedProfit;
+  let totalReturn = balance - deposit;
+  let percent = deposit ? (totalReturn / deposit) * 100 : 0;
+
+  return {
+    deposit,
+    balance,
+    totalReturn,
+    percent,
+    closedProfit,
+    floating,
+    firstClose,
+    funding
+  };
 }
 
-// EMAIL
-function openEmail(){
-  document.getElementById("emailText").value =
-`Account generated $${uiData.periodProfit} during the selected period.
-Current balance is $${uiData.balance}.`;
-  document.getElementById("emailModal").style.display="block";
-}
+function run(type) {
 
-function copyEmail(){
-  navigator.clipboard.writeText(document.getElementById("emailText").value);
-}
-function closeEmail(){
-  document.getElementById("emailModal").style.display="none";
+  loadFile(() => {
+
+    const name = document.getElementById("name").value;
+    const software = document.getElementById("software").value;
+    const onboard = new Date(document.getElementById("onboarding").value);
+
+    let start, end = new Date();
+
+    if (type === "weekly") {
+      start = new Date();
+      start.setDate(start.getDate() - 7);
+    }
+
+    if (type === "30") {
+      start = onboard;
+      end = new Date(onboard);
+      end.setDate(end.getDate() + 30);
+    }
+
+    if (type === "60") {
+      start = onboard;
+      end = new Date(onboard);
+      end.setDate(end.getDate() + 60);
+    }
+
+    if (type === "90") {
+      start = onboard;
+      end = new Date(onboard);
+      end.setDate(end.getDate() + 90);
+    }
+
+    let data = calcData(start, end);
+
+    let paragraph = "";
+
+    if (type === "weekly") {
+      paragraph = `Over the selected weekly period, the account delivered a closed performance of ${data.closedProfit.toFixed(2)}, reflecting short-term trading behavior and recent execution efficiency.`;
+    }
+
+    if (type === "30") {
+      paragraph = `During the first 30 days from onboarding, the account produced a return of ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%). This phase typically reflects initial system adaptation and early-stage performance expectations.`;
+    }
+
+    if (type === "60") {
+      paragraph = `Comparing the 30-day and 60-day performance window, the account shows developing consistency. Current total return stands at ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%), indicating performance progression and stability trends.`;
+    }
+
+    if (type === "90") {
+      paragraph = `Across the full 90-day cycle, the account demonstrates overall system behavior, including growth phases and drawdowns. Total return is ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%).`;
+    }
+
+    if (type === "outlook") {
+      paragraph = `Based on historical performance, the account shows a projected trajectory aligned with its current profitability and consistency levels. While fluctuations remain part of trading, the system indicates a realistic growth potential moving forward.`;
+    }
+
+    let trackDays = Math.floor((new Date() - onboard) / (1000*60*60*24));
+
+    document.getElementById("result").innerHTML = `
+      <b>Name:</b> ${name}<br>
+      <b>Software:</b> ${software}<br>
+      <b>Onboarding Date:</b> ${document.getElementById("onboarding").value}<br><br>
+
+      <b>Total Return:</b> ${data.totalReturn.toFixed(2)} (${data.percent.toFixed(2)}%)<br>
+      <b>Track Record:</b> ${trackDays} days<br>
+      <b>Closed Profit:</b> ${data.closedProfit.toFixed(2)}<br>
+      <b>Floating P/L:</b> ${data.floating.toFixed(2)}<br>
+      <b>First Trade Close:</b> ${data.firstClose || "N/A"}<br>
+
+      <b>Funding Activity:</b><br>
+      ${data.funding.join("<br>") || "None"}<br><br>
+
+      <p>${paragraph}</p>
+    `;
+
+  });
+
 }
 
 </script>
