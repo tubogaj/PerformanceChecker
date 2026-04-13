@@ -6,19 +6,13 @@
 
 <style>
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial;
   background: #f4f4f5;
   color: #111;
   padding: 50px;
 }
+.container { max-width: 1100px; margin: auto; }
 
-/* CONTAINER */
-.container {
-  max-width: 1100px;
-  margin: auto;
-}
-
-/* GLASS CARD */
 .glass {
   background: rgba(255,255,255,0.75);
   backdrop-filter: blur(18px);
@@ -29,39 +23,23 @@ body {
   box-shadow: 0 10px 30px rgba(0,0,0,0.06);
 }
 
-/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.logo {
-  height: 95px;
-}
+.logo { height: 95px; }
 
-h2 {
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-/* INPUTS */
 input {
-  padding: 12px 14px;
+  padding: 12px;
   border-radius: 10px;
   border: 1px solid rgba(0,0,0,0.08);
   background: #fff;
   color: #111;
-  margin: 6px 6px 6px 0;
-  width: 220px;
-  font-size: 14px;
+  margin: 6px;
 }
 
-input::placeholder {
-  color: #999;
-}
-
-/* BUTTONS */
 button {
   padding: 12px 20px;
   border-radius: 10px;
@@ -69,34 +47,23 @@ button {
   background: #111;
   color: #fff;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
 }
+button:hover { background: #333; }
 
-button:hover {
-  background: #333;
-  transform: translateY(-1px);
-}
-
-/* SECTION TITLE */
 .section-title {
   font-size: 13px;
   font-weight: 600;
   color: #666;
   margin-bottom: 14px;
-  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
-/* GRID */
 .data-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
   gap: 14px;
 }
 
-/* DATA CARD */
 .data-item {
   background: #fff;
   padding: 16px;
@@ -104,18 +71,9 @@ button:hover {
   border: 1px solid rgba(0,0,0,0.05);
 }
 
-.data-label {
-  font-size: 12px;
-  color: #777;
-}
+.data-label { font-size: 12px; color: #777; }
+.data-value { font-size: 18px; font-weight: 600; margin-top: 6px; }
 
-.data-value {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 6px;
-}
-
-/* WEEKLY RANGE */
 #weeklyRange {
   margin-top: 14px;
   padding: 14px;
@@ -130,47 +88,43 @@ button:hover {
 
 <div class="container">
 
-<!-- HEADER -->
 <div class="glass header">
   <h2>Account Performance Checker</h2>
   <img src="logo.png" class="logo">
 </div>
 
-<!-- INPUT -->
 <div class="glass">
-  <input type="file" id="fileInput" accept=".csv"><br>
+<input type="file" id="fileInput" accept=".csv"><br>
 
-  <input type="text" id="name" placeholder="Client Name">
-  <input type="text" id="software" placeholder="Software">
-  <input type="date" id="onboarding">
+<input type="text" id="name" placeholder="Client Name">
+<input type="text" id="software" placeholder="Software">
+<input type="date" id="onboarding">
 
-  <div id="weeklyRange" style="display:none;">
-    Start: <input type="date" id="weekStart">
-    End: <input type="date" id="weekEnd">
-  </div>
-
-  <br><br>
-
-  <button onclick="run('weekly')">Weekly</button>
-  <button onclick="run('30')">30 Days</button>
-  <button onclick="run('60')">60 Days</button>
-  <button onclick="run('90')">90 Days</button>
+<div id="weeklyRange" style="display:none;">
+Start: <input type="date" id="weekStart">
+End: <input type="date" id="weekEnd">
 </div>
 
-<!-- OVERVIEW -->
-<div id="overview" class="glass"></div>
+<br><br>
 
-<!-- BREAKDOWN -->
+<button onclick="run('weekly')">Weekly</button>
+<button onclick="run('30')">30 Days</button>
+<button onclick="run('60')">60 Days</button>
+<button onclick="run('90')">90 Days</button>
+<button onclick="copyNote()">Copy to GHL Note</button>
+</div>
+
+<div id="overview" class="glass"></div>
 <div id="breakdown" class="glass"></div>
 
 </div>
 
 <script>
 
-// ===== LOGIC (UNCHANGED) =====
-
 let rows=[];
+let ghlText="";
 
+// ===== PARSE =====
 function parseCSV(text){
   const lines=text.split("\n").filter(l=>l.trim());
   const headers=lines[1].split(",");
@@ -195,6 +149,7 @@ function loadFile(cb){
   reader.readAsText(file);
 }
 
+// ===== CALCS =====
 function getClosed(start,end){
   return rows.filter(r=>{
     let d=new Date(r["Close date"]);
@@ -209,18 +164,32 @@ function getDeposits(start,end){
   }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
+function getWithdrawals(start,end){
+  return rows.filter(r=>{
+    let d=new Date(r["Close date"]);
+    return r.Type==="Withdrawal" && d>=start && d<=end;
+  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
+}
+
 function getFloating(){
   return rows.filter(r=>r.Type==="Open position")
     .reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
 function getFirstClose(onboard){
-  return rows.find(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
+  let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
+  if(!trades.length) return null;
+  trades.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
+  return trades[0];
 }
 
+// ===== MAIN =====
 function run(type){
 
 loadFile(()=>{
+
+const name=document.getElementById("name").value||"Client";
+const software=document.getElementById("software").value||"N/A";
 
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
@@ -229,64 +198,93 @@ if(!first) return alert("No closed trades found");
 let firstDate=new Date(first["Close date"]);
 let today=new Date();
 
-// ACCOUNT DETAILS
 let closedTotal=getClosed(onboard,today);
-let depositTotal=getDeposits(new Date("2000-01-01"),today);
-let balance=depositTotal - closedTotal;
+let deposits=getDeposits(new Date("2000-01-01"),today);
+let withdrawals=getWithdrawals(new Date("2000-01-01"),today);
+
+let balance=deposits + closedTotal - withdrawals;
 let floating=getFloating();
 
 let initialDeposit=getDeposits(new Date("2000-01-01"),onboard);
-let growthPct=initialDeposit?((balance-initialDeposit)/initialDeposit)*100:0;
 let growthVal=balance-initialDeposit;
+let growthPct=initialDeposit?(growthVal/initialDeposit)*100:0;
 
 let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Account Details</div>
 <div class="data-grid">
-  <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})</div></div>
-  <div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
+<div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})</div></div>
+<div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
+<div class="data-item"><div class="data-label">1st Trade Closed</div><div class="data-value">${firstDate.toLocaleDateString()}</div></div>
 </div>
 `;
 
-// TIMEFRAME
+// ===== BREAKDOWN =====
 let start,end,title="";
 
 if(type==="weekly"){
-  document.getElementById("weeklyRange").style.display="block";
-  start=new Date(document.getElementById("weekStart").value);
-  end=new Date(document.getElementById("weekEnd").value);
-  title=`Account Performance (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
+document.getElementById("weeklyRange").style.display="block";
+start=new Date(document.getElementById("weekStart").value);
+end=new Date(document.getElementById("weekEnd").value);
+title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
 }
 else{
-  document.getElementById("weeklyRange").style.display="none";
-  let days=Number(type);
-  start=firstDate;
-  end=new Date(firstDate);
-  end.setDate(end.getDate()+days);
-  title=`Account Performance (${days} Days)`;
+document.getElementById("weeklyRange").style.display="none";
+let days=Number(type);
+start=firstDate;
+end=new Date(firstDate);
+end.setDate(end.getDate()+days);
+title=`${days} Days`;
 }
 
 let closed=getClosed(start,end);
-let deposits=getDeposits(start,end);
-let bal=deposits - closed;
+let dep=getDeposits(start,end);
+let wd=getWithdrawals(start,end);
+let bal=dep + closed - wd;
 let growthTF=initialDeposit?((bal-initialDeposit)/initialDeposit)*100:0;
 
 document.getElementById("breakdown").innerHTML=`
-<div class="section-title">${title}</div>
+<div class="section-title">Account Performance (${title})</div>
 <div class="data-grid">
-  <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
-  <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
+<div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
 </div>
+`;
+
+// ===== GHL TEXT =====
+ghlText = `
+Client: ${name}
+Software: ${software}
+
+--- ACCOUNT DETAILS ---
+Balance: ${balance.toFixed(2)}
+Closed Profits: ${closedTotal.toFixed(2)}
+Floating P/L: ${floating.toFixed(2)}
+Growth: ${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})
+Track Record: ${track} days
+1st Trade Closed: ${firstDate.toLocaleDateString()}
+
+--- PERFORMANCE (${title}) ---
+Balance: ${bal.toFixed(2)}
+Closed Profits: ${closed.toFixed(2)}
+Floating P/L: ${floating.toFixed(2)}
+Growth: ${growthTF.toFixed(2)}%
 `;
 
 });
 
+}
+
+function copyNote(){
+  if(!ghlText) return alert("Run analysis first");
+  navigator.clipboard.writeText(ghlText);
+  alert("Copied to clipboard!");
 }
 
 </script>
