@@ -176,24 +176,24 @@ let firstDate=new Date(first["Close date"]);
 let today=new Date();
 
 // ===== ACCOUNT DETAILS =====
-let depositsAll=sum(rows.filter(r=>r.Type==="Deposit").map(r=>Number(r["Net profit"])||0));
-let withdrawalsAll=sum(rows.filter(r=>r.Type==="Withdrawal").map(r=>Number(r["Net profit"])||0));
-let closedTotal=sum(filter("Closed position",onboard,today));
+let depAll=sum(rows.filter(r=>r.Type==="Deposit").map(r=>Number(r["Net profit"])||0));
+let wdAll=sum(rows.filter(r=>r.Type==="Withdrawal").map(r=>Number(r["Net profit"])||0));
+let closedAll=sum(filter("Closed position",onboard,today));
 
-let balance=depositsAll - withdrawalsAll + closedTotal;
+let balance=depAll - wdAll + closedAll;
 let floating=sum(rows.filter(r=>r.Type==="Open position").map(r=>Number(r["Net profit"])||0));
 
-let growthPct=depositsAll?(closedTotal/depositsAll)*100:0;
-
+let growthPct=depAll?(closedAll/depAll)*100:0;
 let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
+// UI TOP
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Account Details</div>
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedAll.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${closedTotal.toFixed(2)})</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}%</div></div>
 <div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
 <div class="data-item"><div class="data-label">1st Trade Closed</div><div class="data-value">${firstDate.toLocaleDateString()}</div></div>
 </div>
@@ -201,41 +201,30 @@ document.getElementById("overview").innerHTML=`
 
 // ===== TIMEFRAME =====
 let start,end,title;
-let bal;
 
 if(type==="weekly"){
 document.getElementById("weeklyRange").style.display="block";
 start=new Date(document.getElementById("weekStart").value);
 end=new Date(document.getElementById("weekEnd").value);
 title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
-
-// weekly uses running balance
-bal = balance;
-
 }else{
-
 document.getElementById("weeklyRange").style.display="none";
-let d=Number(type);
-
-start=onboard;
+let days=Number(type);
+start=firstDate;
 end=new Date(firstDate);
-end.setDate(end.getDate()+d);
+end.setDate(end.getDate()+(days-1));
+title=`${days} Days`;
+}
 
-title=`${d} Days`;
-
-// CORRECT LOGIC
+// ===== SAME FORMULA =====
 let dep=sum(filter("Deposit",start,end));
 let wd=sum(filter("Withdrawal",start,end));
 let closed=sum(filter("Closed position",start,end));
 
-bal = dep - wd + closed;
-}
+let bal=dep - wd + closed;
+let growthTF=dep?(closed/dep)*100:0;
 
-// common metrics
-let closedTF=sum(filter("Closed position",start,end));
-let growthPctTF=depositsAll?(closedTF/depositsAll)*100:0;
-
-// funding
+// FUNDING
 let fundingRows=rows.filter(r=>{
 let d=new Date(r["Close date"]);
 return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
@@ -247,24 +236,26 @@ let label=amt>=0?"Deposit":"Withdrawal";
 return `${r["Close date"]} → ${label} (${amt})`;
 });
 
+// UI
 document.getElementById("breakdown").innerHTML=`
 <div class="section-title">Account Performance (${title})</div>
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTF.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}%</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
 </div>
 
 ${fundingList.length ? `<div class="funding"><b>Funding:</b><br>${fundingList.join("<br>")}</div>` : ""}
 `;
 
+// GHL
 ghlText = `
 Software: ${software}
 
 --- ACCOUNT DETAILS ---
 Balance: ${balance.toFixed(2)}
-Closed Profits: ${closedTotal.toFixed(2)}
+Closed Profits: ${closedAll.toFixed(2)}
 Floating: ${floating.toFixed(2)}
 Growth: ${growthPct.toFixed(2)}%
 Track Record: ${track} days
@@ -272,9 +263,9 @@ Track Record: ${track} days
 
 --- PERFORMANCE (${title}) ---
 Balance: ${bal.toFixed(2)}
-Closed Profits: ${closedTF.toFixed(2)}
+Closed Profits: ${closed.toFixed(2)}
 Floating: ${floating.toFixed(2)}
-Growth: ${growthPctTF.toFixed(2)}%
+Growth: ${growthTF.toFixed(2)}%
 
 ${fundingList.length ? "Funding:\n"+fundingList.join("\n") : ""}
 `;
