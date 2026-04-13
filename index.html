@@ -2,90 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Conan - Account Performance Checker</title>
+<title>Performance Checker</title>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body {
     font-family: Arial;
-    background: linear-gradient(135deg, #0f172a, #020617);
-    color: #e2e8f0;
+    background: #ffffff;
+    color: #000;
     padding: 20px;
 }
 
-.container {
-    max-width: 1000px;
-    margin: auto;
-}
+.container { max-width: 1100px; margin: auto; }
 
-/* LOGO */
-.logo {
-    text-align: center;
-    margin-bottom: 10px;
-}
-
-.logo img {
-    width: 220px;
-    opacity: 0.9;
-}
-
-/* WATERMARK */
-body::before {
-    content: "";
-    background: url('logo.png') no-repeat center;
-    background-size: 500px;
-    opacity: 0.03;
-    position: fixed;
-    top:0; left:0;
-    width:100%; height:100%;
-    z-index:0;
-}
+h1 { text-align: center; }
 
 .card {
-    background: rgba(30, 41, 59, 0.9);
+    background: #fff;
+    border: 3px solid #000;
     padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    position: relative;
-    z-index: 1;
-    backdrop-filter: blur(10px);
-}
-
-h1 {
-    text-align: center;
     margin-bottom: 20px;
 }
 
-input, select {
+input {
     width: 100%;
     padding: 10px;
     margin-bottom: 10px;
-    border-radius: 8px;
-    border: none;
-    background: #0f172a;
-    color: #fff;
+    border: 2px solid #000;
 }
 
 button {
-    padding: 12px;
-    border-radius: 10px;
-    border: none;
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-    color: white;
-    cursor: pointer;
     width: 100%;
+    padding: 12px;
+    background: #000;
+    color: #fff;
+    border: 2px solid #000;
     font-weight: bold;
+    cursor: pointer;
 }
 
-button:hover {
-    box-shadow: 0 0 15px #3b82f6;
-}
+button:hover { background: #333; }
 
 canvas {
     background: #fff;
-    border-radius: 10px;
+    border: 3px solid #000;
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    border: 2px solid #000;
+    padding: 8px;
+    text-align: center;
+}
+
+th {
+    background: #000;
+    color: #fff;
 }
 </style>
 </head>
@@ -94,29 +72,16 @@ canvas {
 
 <div class="container">
 
-<div class="logo">
-    <img src="logo.png" alt="Company Logo">
-</div>
-
 <h1>Conan - Account Performance Checker</h1>
 
 <div class="card">
 <input id="name" placeholder="Client Name">
-<input id="software" placeholder="Software (R-10, R-50, R-X5, etc)">
-<input type="date" id="onboarding">
-
-<label>Tone:</label>
-<select id="tone">
-<option value="conservative">Conservative</option>
-<option value="confident">Confident</option>
-<option value="technical">Technical</option>
-</select>
-
-<input type="file" id="file">
+<input id="software" placeholder="Software (R-10, R-50, R-X5, R-S15, R-A10)">
+<input type="file" id="file" accept=".csv">
 </div>
 
 <div class="card">
-<button onclick="analyze()">Generate Report</button>
+<button onclick="analyze()">Generate Analysis</button>
 </div>
 
 <div class="card" id="result"></div>
@@ -125,46 +90,69 @@ canvas {
 <canvas id="chart"></canvas>
 </div>
 
+<div class="card">
+<h3>Monthly Breakdown</h3>
+<table id="monthlyTable">
+<thead>
+<tr>
+<th>Month</th>
+<th>Trades</th>
+<th>Net Profit</th>
+<th>Win Rate</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
 </div>
 
 <script>
 
-// DATA
 let trades=[], equity=[], deposit=0, withdrawals=0;
 
-// LOAD EXCEL
+// CSV LOAD
 document.getElementById('file').addEventListener('change', e=>{
     let reader=new FileReader();
     reader.onload=e=>{
-        let wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-        let json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        process(json);
+        let rows=e.target.result.split("\n").map(r=>r.split(","));
+        let headers=rows[0].map(h=>h.trim());
+        processCSV(headers, rows.slice(1));
     };
-    reader.readAsArrayBuffer(e.target.files[0]);
+    reader.readAsText(e.target.files[0]);
 });
 
-function process(data){
+// PROCESS
+function processCSV(headers, rows){
+
     trades=[]; equity=[]; deposit=0; withdrawals=0;
     let bal=0;
 
-    data.forEach(r=>{
-        let type=(r.Type||"").toLowerCase();
-        let p=parseFloat(r.Profit||0);
+    let t=headers.indexOf("Type");
+    let p=headers.indexOf("Net Profit");
+    let c=headers.indexOf("Close Time");
 
-        if(type.includes("deposit")){deposit+=p; bal+=p;}
-        else if(type.includes("withdrawal")){withdrawals+=Math.abs(p); bal+=p;}
-        else if(r["Close Time"]){
-            bal+=p;
-            trades.push({date:new Date(r["Close Time"]), profit:p});
-            equity.push({date:new Date(r["Close Time"]), balance:bal});
+    rows.forEach(r=>{
+        let type=(r[t]||"").toLowerCase();
+        let profit=parseFloat(r[p])||0;
+
+        if(type.includes("deposit")){deposit+=profit; bal+=profit;}
+        else if(type.includes("withdrawal")){withdrawals+=Math.abs(profit); bal+=profit;}
+        else if(r[c]){
+            bal+=profit;
+            let d=new Date(r[c]);
+
+            trades.push({date:d, profit:profit});
+            equity.push({date:d, balance:bal});
         }
     });
 
-    alert("Excel Loaded ✅");
+    alert("CSV Loaded");
 }
 
 // METRICS
 function metrics(){
+
     let total=trades.reduce((a,b)=>a+b.profit,0);
     let wins=trades.filter(t=>t.profit>0);
     let losses=trades.filter(t=>t.profit<0);
@@ -173,7 +161,8 @@ function metrics(){
     let avgWin=wins.length?wins.reduce((a,b)=>a+b.profit,0)/wins.length:0;
     let avgLoss=losses.length?losses.reduce((a,b)=>a+b.profit,0)/losses.length:0;
 
-    let peak=0, maxDD=0;
+    let peak=0,maxDD=0;
+
     equity.forEach(p=>{
         if(p.balance>peak) peak=p.balance;
         let dd=(peak-p.balance)/peak*100;
@@ -189,58 +178,87 @@ function metrics(){
     };
 }
 
-// STRATEGY
-function strategyText(s){
-    s=s.toUpperCase();
-    if(s.includes("R-X5")) return "a conservative system focused on capital preservation and gradual growth.";
-    if(s.includes("R-X25")) return "a structured compounding system with steady growth.";
-    if(s.includes("R-C30")) return "a high-volatility crypto trading system.";
-    if(s.includes("R-50")) return "a diversified multi-strategy allocation system.";
-    if(s.includes("R-10")) return "a high-frequency statistical execution system.";
-    return "an adaptive trading system.";
+// MONTHLY TABLE
+function buildMonthlyTable(){
+
+    let map={};
+
+    trades.forEach(t=>{
+        let key=t.date.getFullYear()+"-"+(t.date.getMonth()+1);
+
+        if(!map[key]){
+            map[key]={profit:0,trades:0,wins:0};
+        }
+
+        map[key].profit+=t.profit;
+        map[key].trades++;
+        if(t.profit>0) map[key].wins++;
+    });
+
+    let tbody=document.querySelector("#monthlyTable tbody");
+    tbody.innerHTML="";
+
+    Object.keys(map).sort().forEach(m=>{
+        let data=map[m];
+        let winRate=(data.wins/data.trades*100)||0;
+
+        let row=`
+        <tr>
+        <td>${m}</td>
+        <td>${data.trades}</td>
+        <td>$${data.profit.toFixed(2)}</td>
+        <td>${winRate.toFixed(2)}%</td>
+        </tr>
+        `;
+        tbody.innerHTML+=row;
+    });
 }
 
-// GPT REPORT WITH TONE
-function gptReport(name, software, m, tone){
+// STRATEGY
+function behavior(s){
+    s=s.toUpperCase();
 
-    let intro={
-        conservative:`Hi ${name}, here’s a balanced update on your account.`,
-        confident:`Hi ${name}, great to share your latest performance.`,
-        technical:`Performance summary for ${name}'s account:`
-    };
+    if(s.includes("R-X5")) return "Low-risk system, gradual growth.";
+    if(s.includes("R-X25")) return "Structured compounding system.";
+    if(s.includes("R-C30")) return "High volatility crypto behavior.";
+    if(s.includes("R-50")) return "Diversified multi-strategy.";
+    if(s.includes("R-10")) return "High-frequency execution.";
+    if(s.includes("R-S15")) return "Intraday news-driven spikes.";
+    if(s.includes("R-A10")) return "Reversal system with low drawdown.";
 
-    let body={
-        conservative:`The account is progressing steadily with drawdown at ${m.maxDD}% and a win rate of ${m.winRate}%.`,
-        confident:`Strong performance with ${m.winRate}% win rate and controlled drawdown at ${m.maxDD}%.`,
-        technical:`Win rate: ${m.winRate}%, Avg Win: ${m.avgWin}, Avg Loss: ${m.avgLoss}, Max DD: ${m.maxDD}%.`
-    };
+    return "Adaptive system.";
+}
 
-    let closing={
-        conservative:"Focus remains on long-term stability.",
-        confident:"We expect continued strong performance.",
-        technical:"System operating within expected parameters."
-    };
+// AM REPORT
+function report(software,m){
 
     return `
-${intro[tone]}
+--- PERFORMANCE ---
+${m.total>0?"Profitable":"Drawdown phase"}
 
-${body[tone]}
+--- RISK ---
+${m.maxDD>20?"High risk":"Moderate/Controlled risk"}
 
-The system operates as ${strategyText(software)}
+--- EXECUTION ---
+Win Rate: ${m.winRate}%
 
-${closing[tone]}
+--- RISK/REWARD ---
+${parseFloat(m.avgWin)>Math.abs(parseFloat(m.avgLoss))?"Positive RR":"Negative RR"}
+
+--- STRATEGY ---
+${behavior(software)}
 `;
 }
 
 // CHART
-function drawChart(){
-    let ctx=document.getElementById('chart');
-    new Chart(ctx,{
+function chart(){
+
+    new Chart(document.getElementById('chart'),{
         type:'line',
         data:{
             labels:equity.map(e=>e.date.toLocaleDateString()),
             datasets:[{
-                label:'Equity Curve',
+                label:'Equity',
                 data:equity.map(e=>e.balance),
                 borderWidth:2
             }]
@@ -253,28 +271,25 @@ function analyze(){
 
     let name=document.getElementById("name").value;
     let software=document.getElementById("software").value;
-    let tone=document.getElementById("tone").value;
 
     let m=metrics();
 
-    let output=`
+    document.getElementById("result").innerText=`
 Client: ${name}
 Software: ${software}
 
---- PERFORMANCE SUMMARY ---
-Total Profit: $${m.total}
+--- METRICS ---
+Total Net Profit: $${m.total}
 Win Rate: ${m.winRate}%
 Avg Win: $${m.avgWin}
 Avg Loss: $${m.avgLoss}
 Max Drawdown: ${m.maxDD}%
 
---- ACCOUNT MANAGER REPORT ---
-${gptReport(name, software, m, tone)}
+${report(software,m)}
 `;
 
-    document.getElementById("result").innerText=output;
-
-    drawChart();
+    chart();
+    buildMonthlyTable();
 }
 
 </script>
