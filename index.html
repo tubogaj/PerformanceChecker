@@ -6,64 +6,58 @@
 
 <style>
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial;
+  font-family: -apple-system, 'Segoe UI';
   background: #f4f4f5;
-  color: #111;
   padding: 50px;
+  color: #111;
 }
-.container { max-width: 1100px; margin: auto; }
+.container { max-width:1100px;margin:auto; }
 
 .glass {
   background: rgba(255,255,255,0.75);
   backdrop-filter: blur(18px);
   border-radius: 18px;
   padding: 30px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  margin-bottom: 20px;
+  border:1px solid rgba(0,0,0,0.05);
 }
 
-.header {
-  display:flex;justify-content:space-between;align-items:center;
-}
-.logo { height:95px; }
+.header { display:flex;justify-content:space-between;align-items:center; }
+.logo { height:90px; }
 
 input {
-  padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,0.08);
-  background:#fff;margin:6px;
+  padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px;
 }
 
 button {
-  padding:12px 20px;border-radius:10px;border:none;
-  background:#111;color:#fff;cursor:pointer;
+  padding:10px 16px;
+  border:none;border-radius:8px;
+  background:#111;color:#fff;
+  cursor:pointer;
 }
 button:hover { background:#333; }
 
-.section-title {
-  font-size:13px;font-weight:600;color:#666;margin-bottom:14px;
-  text-transform:uppercase;
-}
+.hidden { display:none; }
 
 .data-grid {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:14px;
+  gap:12px;
 }
 
 .data-item {
-  background:#fff;padding:16px;border-radius:12px;
-  border:1px solid rgba(0,0,0,0.05);
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #eee;
 }
 
-.data-label { font-size:12px;color:#777; }
-.data-value { font-size:18px;font-weight:600; }
-
-#weeklyRange {
-  margin-top:14px;padding:14px;border-radius:12px;
-  background:#fff;border:1px solid rgba(0,0,0,0.05);
+.section-title {
+  font-size:13px;
+  color:#666;
+  margin-bottom:10px;
+  text-transform:uppercase;
 }
-
-.funding { margin-top:15px;font-size:13px; }
 </style>
 </head>
 
@@ -77,23 +71,26 @@ button:hover { background:#333; }
 </div>
 
 <div class="glass">
-<input type="file" id="fileInput" accept=".csv"><br>
 
+<input type="file" id="fileInput" accept=".csv"><br>
 <input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
-<div id="weeklyRange" style="display:none;">
-Start: <input type="date" id="weekStart">
-End: <input type="date" id="weekEnd">
+<!-- Weekly cleaner UI -->
+<div id="weeklyBox" class="hidden">
+  <input type="date" id="weekStart">
+  <input type="date" id="weekEnd">
+  <button onclick="run('weekly')">Run Weekly</button>
 </div>
 
-<br><br>
+<br>
 
-<button onclick="run('weekly')">Weekly</button>
+<button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
-<button onclick="copyNote()">Copy to GHL Note</button>
+<button onclick="copyNote()">Copy GHL</button>
+
 </div>
 
 <div id="overview" class="glass"></div>
@@ -106,10 +103,26 @@ End: <input type="date" id="weekEnd">
 let rows=[];
 let ghlText="";
 
+// AUTO LOAD
+document.getElementById("fileInput").addEventListener("change",loadAndInit);
+document.getElementById("onboarding").addEventListener("change",loadAndInit);
+
+function loadAndInit(){
+  const file=document.getElementById("fileInput").files[0];
+  const onboard=document.getElementById("onboarding").value;
+  if(!file || !onboard) return;
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    rows=parseCSV(e.target.result);
+    renderAccount();
+  };
+  reader.readAsText(file);
+}
+
 function parseCSV(text){
   const lines=text.split("\n").filter(l=>l.trim());
   const headers=lines[1].split(",");
-
   return lines.slice(2).map(line=>{
     const values=line.split(",");
     let obj={};
@@ -118,159 +131,105 @@ function parseCSV(text){
   });
 }
 
-function loadFile(cb){
-  const file=document.getElementById("fileInput").files[0];
-  if(!file) return alert("Upload CSV");
-
-  const reader=new FileReader();
-  reader.onload=e=>{
-    rows=parseCSV(e.target.result);
-    cb();
-  };
-  reader.readAsText(file);
-}
-
 function sum(arr){ return arr.reduce((s,v)=>s+v,0); }
 
-function filter(type,start,end){
-  return rows.filter(r=>{
-    let d=new Date(r["Close date"]);
-    return r.Type===type && d>=start && d<=end;
-  }).map(r=>Number(r["Net profit"])||0);
-}
-
-function getUpTo(type,end){
-  return rows.filter(r=>{
-    let d=new Date(r["Close date"]);
-    return r.Type===type && d<=end;
-  }).map(r=>Number(r["Net profit"])||0);
+function get(type,cond){
+  return rows.filter(cond).map(r=>Number(r["Net profit"])||0);
 }
 
 function getFirstClose(onboard){
-  let t=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
-  t.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
-  return t[0];
+  return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard)
+    .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
-function run(type){
+// ===== ACCOUNT DETAILS AUTO =====
+function renderAccount(){
 
-loadFile(()=>{
-
-const software=document.getElementById("software").value||"N/A";
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
-if(!first) return alert("No trades");
+if(!first) return;
 
-let firstDate=new Date(first["Close date"]);
-let today=new Date();
+let dep=sum(get("Deposit",r=>r.Type==="Deposit"));
+let wd=sum(get("Withdrawal",r=>r.Type==="Withdrawal"));
+let closed=sum(get("Closed",r=>r.Type==="Closed position"));
+let floating=sum(get("Open",r=>r.Type==="Open position"));
 
-// ===== ACCOUNT DETAILS =====
-let depAll=sum(rows.filter(r=>r.Type==="Deposit").map(r=>Number(r["Net profit"])||0));
-let wdAll=sum(rows.filter(r=>r.Type==="Withdrawal").map(r=>Number(r["Net profit"])||0));
-let closedAll=sum(rows.filter(r=>r.Type==="Closed position").map(r=>Number(r["Net profit"])||0));
+let bal=dep-wd+closed;
+let growth=dep?(closed/dep)*100:0;
 
-let balance=depAll - wdAll + closedAll;
-let floating=sum(rows.filter(r=>r.Type==="Open position").map(r=>Number(r["Net profit"])||0));
-let growthPct=depAll?(closedAll/depAll)*100:0;
-let track=Math.floor((today-firstDate)/(1000*60*60*24));
-
-// UI TOP
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Account Details</div>
 <div class="data-grid">
-<div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedAll.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}%</div></div>
-<div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
-<div class="data-item"><div class="data-label">1st Trade Closed</div><div class="data-value">${firstDate.toLocaleDateString()}</div></div>
+<div class="data-item">Balance: ${bal.toFixed(2)}</div>
+<div class="data-item">Closed: ${closed.toFixed(2)}</div>
+<div class="data-item">Floating: ${floating.toFixed(2)}</div>
+<div class="data-item">Growth: ${growth.toFixed(2)}%</div>
+<div class="data-item">1st Trade: ${new Date(first["Close date"]).toLocaleDateString()}</div>
 </div>
 `;
+}
 
-// ===== TIMEFRAME =====
-let start,end,title;
-
-if(type==="weekly"){
-document.getElementById("weeklyRange").style.display="block";
-start=new Date(document.getElementById("weekStart").value);
-end=new Date(document.getElementById("weekEnd").value);
-title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
-}else{
-document.getElementById("weeklyRange").style.display="none";
-let days=Number(type);
-start=firstDate;
-end=new Date(firstDate);
-end.setDate(end.getDate()+(days-1));
-title=`${days} Days`;
+// ===== WEEKLY UI =====
+function showWeekly(){
+  document.getElementById("weeklyBox").classList.remove("hidden");
 }
 
 // ===== PERFORMANCE =====
+function run(type){
 
-// snapshot balance (correct)
-let depToEnd=sum(getUpTo("Deposit",end));
-let wdToEnd=sum(getUpTo("Withdrawal",end));
-let closedToEnd=sum(getUpTo("Closed position",end));
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
 
-let bal=depToEnd - wdToEnd + closedToEnd;
+let start,end,title;
 
-// timeframe profit (correct)
-let closedTF=sum(filter("Closed position",start,end));
-let growthTF=depToEnd?(closedTF/depToEnd)*100:0;
+if(type==="weekly"){
+  start=new Date(document.getElementById("weekStart").value);
+  end=new Date(document.getElementById("weekEnd").value);
 
-// funding list
-let fundingRows=rows.filter(r=>{
-let d=new Date(r["Close date"]);
-return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
-});
+  if(!start || !end) return alert("Select dates");
 
-let fundingList=fundingRows.map(r=>{
-let amt=Number(r["Net profit"])||0;
-let label=amt>=0?"Deposit":"Withdrawal";
-return `${r["Close date"]} → ${label} (${amt})`;
-});
+  title=`Weekly`;
+}else{
+  document.getElementById("weeklyBox").classList.add("hidden");
 
-// UI
-document.getElementById("breakdown").innerHTML=`
-<div class="section-title">Account Performance (${title})</div>
-<div class="data-grid">
-<div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTF.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
-</div>
-
-${fundingList.length ? `<div class="funding"><b>Funding:</b><br>${fundingList.join("<br>")}</div>` : ""}
-`;
-
-// GHL
-ghlText = `
-Software: ${software}
-
---- ACCOUNT DETAILS ---
-Balance: ${balance.toFixed(2)}
-Closed Profits: ${closedAll.toFixed(2)}
-Floating: ${floating.toFixed(2)}
-Growth: ${growthPct.toFixed(2)}%
-Track Record: ${track} days
-1st Trade Closed: ${firstDate.toLocaleDateString()}
-
---- PERFORMANCE (${title}) ---
-Balance: ${bal.toFixed(2)}
-Closed Profits: ${closedTF.toFixed(2)}
-Floating: ${floating.toFixed(2)}
-Growth: ${growthTF.toFixed(2)}%
-
-${fundingList.length ? "Funding:\n"+fundingList.join("\n") : ""}
-`;
-
-});
-
+  let days=Number(type);
+  start=new Date(first["Close date"]);
+  end=new Date(start);
+  end.setDate(end.getDate()+(days-1));
+  title=`${days} Days`;
 }
 
+// SNAPSHOT
+let dep=sum(get("d",r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
+let wd=sum(get("w",r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
+let closedTotal=sum(get("c",r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
+
+let bal=dep-wd+closedTotal;
+
+// PERIOD PROFIT
+let closedTF=sum(get("c2",r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+
+document.getElementById("breakdown").innerHTML=`
+<div class="section-title">Performance (${title})</div>
+<div class="data-grid">
+<div class="data-item">Balance: ${bal.toFixed(2)}</div>
+<div class="data-item">Closed Profit: ${closedTF.toFixed(2)}</div>
+</div>
+`;
+
+ghlText=`Software: ${document.getElementById("software").value}
+
+Balance: ${bal.toFixed(2)}
+Closed: ${closedTF.toFixed(2)}
+`;
+}
+
+// COPY
 function copyNote(){
-if(!ghlText) return alert("Run first");
-navigator.clipboard.writeText(ghlText);
-alert("Copied!");
+  if(!ghlText) return alert("Run first");
+  navigator.clipboard.writeText(ghlText);
+  alert("Copied");
 }
 
 </script>
