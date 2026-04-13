@@ -24,64 +24,46 @@ body {
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display:flex;justify-content:space-between;align-items:center;
 }
-
-.logo { height: 95px; }
+.logo { height:95px; }
 
 input {
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: #fff;
-  margin: 6px;
+  padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,0.08);
+  background:#fff;margin:6px;
 }
 
 button {
-  padding: 12px 20px;
-  border-radius: 10px;
-  border: none;
-  background: #111;
-  color: #fff;
-  cursor: pointer;
+  padding:12px 20px;border-radius:10px;border:none;
+  background:#111;color:#fff;cursor:pointer;
 }
-button:hover { background: #333; }
+button:hover { background:#333; }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 14px;
-  text-transform: uppercase;
+  font-size:13px;font-weight:600;color:#666;margin-bottom:14px;
+  text-transform:uppercase;
 }
 
 .data-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
-  gap: 14px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:14px;
 }
 
 .data-item {
-  background: #fff;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.05);
+  background:#fff;padding:16px;border-radius:12px;
+  border:1px solid rgba(0,0,0,0.05);
 }
 
-.data-label { font-size: 12px; color: #777; }
-.data-value { font-size: 18px; font-weight: 600; }
+.data-label { font-size:12px;color:#777; }
+.data-value { font-size:18px;font-weight:600; }
 
 #weeklyRange {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.05);
+  margin-top:14px;padding:14px;border-radius:12px;
+  background:#fff;border:1px solid rgba(0,0,0,0.05);
 }
 
-.funding { margin-top: 15px; font-size: 13px; }
+.funding { margin-top:15px;font-size:13px; }
 </style>
 </head>
 
@@ -157,6 +139,13 @@ function filter(type,start,end){
   }).map(r=>Number(r["Net profit"])||0);
 }
 
+function getUpTo(type,end){
+  return rows.filter(r=>{
+    let d=new Date(r["Close date"]);
+    return r.Type===type && d<=end;
+  }).map(r=>Number(r["Net profit"])||0);
+}
+
 function getFirstClose(onboard){
   let t=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
   t.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
@@ -178,11 +167,10 @@ let today=new Date();
 // ===== ACCOUNT DETAILS =====
 let depAll=sum(rows.filter(r=>r.Type==="Deposit").map(r=>Number(r["Net profit"])||0));
 let wdAll=sum(rows.filter(r=>r.Type==="Withdrawal").map(r=>Number(r["Net profit"])||0));
-let closedAll=sum(filter("Closed position",onboard,today));
+let closedAll=sum(rows.filter(r=>r.Type==="Closed position").map(r=>Number(r["Net profit"])||0));
 
 let balance=depAll - wdAll + closedAll;
 let floating=sum(rows.filter(r=>r.Type==="Open position").map(r=>Number(r["Net profit"])||0));
-
 let growthPct=depAll?(closedAll/depAll)*100:0;
 let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
@@ -216,15 +204,20 @@ end.setDate(end.getDate()+(days-1));
 title=`${days} Days`;
 }
 
-// ===== SAME FORMULA =====
-let dep=sum(filter("Deposit",start,end));
-let wd=sum(filter("Withdrawal",start,end));
-let closed=sum(filter("Closed position",start,end));
+// ===== PERFORMANCE =====
 
-let bal=dep - wd + closed;
-let growthTF=dep?(closed/dep)*100:0;
+// snapshot balance (correct)
+let depToEnd=sum(getUpTo("Deposit",end));
+let wdToEnd=sum(getUpTo("Withdrawal",end));
+let closedToEnd=sum(getUpTo("Closed position",end));
 
-// FUNDING
+let bal=depToEnd - wdToEnd + closedToEnd;
+
+// timeframe profit (correct)
+let closedTF=sum(filter("Closed position",start,end));
+let growthTF=depToEnd?(closedTF/depToEnd)*100:0;
+
+// funding list
 let fundingRows=rows.filter(r=>{
 let d=new Date(r["Close date"]);
 return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
@@ -241,7 +234,7 @@ document.getElementById("breakdown").innerHTML=`
 <div class="section-title">Account Performance (${title})</div>
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTF.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
 </div>
@@ -263,7 +256,7 @@ Track Record: ${track} days
 
 --- PERFORMANCE (${title}) ---
 Balance: ${bal.toFixed(2)}
-Closed Profits: ${closed.toFixed(2)}
+Closed Profits: ${closedTF.toFixed(2)}
 Floating: ${floating.toFixed(2)}
 Growth: ${growthTF.toFixed(2)}%
 
