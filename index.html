@@ -81,11 +81,7 @@ button:hover { background: #333; }
   border: 1px solid rgba(0,0,0,0.05);
 }
 
-.funding {
-  margin-top: 15px;
-  font-size: 13px;
-  color: #444;
-}
+.funding { margin-top: 15px; font-size: 13px; }
 </style>
 </head>
 
@@ -152,21 +148,19 @@ function loadFile(cb){
   reader.readAsText(file);
 }
 
-function filterRows(type,start,end){
+function sum(arr){ return arr.reduce((s,v)=>s+v,0); }
+
+function filter(type,start,end){
   return rows.filter(r=>{
     let d=new Date(r["Close date"]);
     return r.Type===type && d>=start && d<=end;
-  });
-}
-
-function sum(rows){
-  return rows.reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
+  }).map(r=>Number(r["Net profit"])||0);
 }
 
 function getFirstClose(onboard){
-  let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
-  trades.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
-  return trades[0];
+  let t=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
+  t.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
+  return t[0];
 }
 
 function run(type){
@@ -182,16 +176,14 @@ let firstDate=new Date(first["Close date"]);
 let today=new Date();
 
 // ===== ACCOUNT DETAILS =====
-let closedTotal=sum(filterRows("Closed position",onboard,today));
-let depTotal=sum(filterRows("Deposit",new Date("2000-01-01"),today));
-let wdTotal=sum(filterRows("Withdrawal",new Date("2000-01-01"),today));
+let depositsAll=sum(rows.filter(r=>r.Type==="Deposit").map(r=>Number(r["Net profit"])||0));
+let withdrawalsAll=sum(rows.filter(r=>r.Type==="Withdrawal").map(r=>Number(r["Net profit"])||0));
+let closedTotal=sum(filter("Closed position",onboard,today));
 
-let balance=depTotal + closedTotal - wdTotal;
-let floating=sum(rows.filter(r=>r.Type==="Open position"));
+let balance=depositsAll - withdrawalsAll + closedTotal;
+let floating=sum(rows.filter(r=>r.Type==="Open position").map(r=>Number(r["Net profit"])||0));
 
-let initialDep=sum(filterRows("Deposit",new Date("2000-01-01"),onboard));
-let growthVal=balance-initialDep;
-let growthPct=initialDep?(growthVal/initialDep)*100:0;
+let growthPct=depositsAll?(closedTotal/depositsAll)*100:0;
 
 let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
@@ -201,7 +193,7 @@ document.getElementById("overview").innerHTML=`
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${closedTotal.toFixed(2)})</div></div>
 <div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
 <div class="data-item"><div class="data-label">1st Trade Closed</div><div class="data-value">${firstDate.toLocaleDateString()}</div></div>
 </div>
@@ -217,35 +209,33 @@ end=new Date(document.getElementById("weekEnd").value);
 title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
 }else{
 document.getElementById("weeklyRange").style.display="none";
-let days=Number(type);
+let d=Number(type);
 start=firstDate;
 end=new Date(firstDate);
-end.setDate(end.getDate()+days);
-title=`${days} Days`;
+end.setDate(end.getDate()+d);
+title=`${d} Days`;
 }
 
-// ===== PERFORMANCE =====
-let closed=sum(filterRows("Closed position",start,end));
-let dep=sum(filterRows("Deposit",start,end));
-let wd=sum(filterRows("Withdrawal",start,end));
+// PERFORMANCE
+let closed=sum(filter("Closed position",start,end));
+let dep=sum(filter("Deposit",start,end));
+let wd=sum(filter("Withdrawal",start,end));
 
-let bal=dep + closed - wd;
-let growthValTF=bal - dep;
-let growthPctTF=dep?(growthValTF/dep)*100:0;
+let base = depositsAll + dep;
+let bal = base - wd + closed;
+let growthPctTF = base ? (closed/base)*100 : 0;
 
-// FUNDING LIST
+// FUNDING
 let fundingRows=rows.filter(r=>{
   let d=new Date(r["Close date"]);
-  return (r.Type==="Deposit" || r.Type==="Withdrawal") && d>=start && d<=end;
+  return (r.Type==="Deposit"||r.Type==="Withdrawal") && d>=start && d<=end;
 });
 
-let fundingHTML = fundingRows.length
-  ? fundingRows.map(r=>{
-      let amt=Number(r["Net profit"])||0;
-      let label=amt>=0?"Deposit":"Withdrawal";
-      return `${r["Close date"]} → ${label} (${amt})`;
-    }).join("<br>")
-  : "None";
+let fundingList = fundingRows.map(r=>{
+  let amt=Number(r["Net profit"])||0;
+  let label=amt>=0?"Deposit":"Withdrawal";
+  return `${r["Close date"]} → ${label} (${amt})`;
+});
 
 document.getElementById("breakdown").innerHTML=`
 <div class="section-title">Account Performance (${title})</div>
@@ -253,15 +243,13 @@ document.getElementById("breakdown").innerHTML=`
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}% (${growthValTF.toFixed(2)})</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}% (${closed.toFixed(2)})</div></div>
 </div>
 
-<div class="funding">
-<b>Funding Activity:</b><br>${fundingHTML}
-</div>
+${fundingList.length ? `<div class="funding"><b>Funding:</b><br>${fundingList.join("<br>")}</div>` : ""}
 `;
 
-// ===== GHL =====
+// GHL
 ghlText = `
 Software: ${software}
 
@@ -269,7 +257,7 @@ Software: ${software}
 Balance: ${balance.toFixed(2)}
 Closed Profits: ${closedTotal.toFixed(2)}
 Floating: ${floating.toFixed(2)}
-Growth: ${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})
+Growth: ${growthPct.toFixed(2)}% (${closedTotal.toFixed(2)})
 Track Record: ${track} days
 1st Trade Closed: ${firstDate.toLocaleDateString()}
 
@@ -277,10 +265,9 @@ Track Record: ${track} days
 Balance: ${bal.toFixed(2)}
 Closed Profits: ${closed.toFixed(2)}
 Floating: ${floating.toFixed(2)}
-Growth: ${growthPctTF.toFixed(2)}% (${growthValTF.toFixed(2)})
+Growth: ${growthPctTF.toFixed(2)}% (${closed.toFixed(2)})
 
-Funding:
-${fundingHTML.replace(/<br>/g,"\n")}
+${fundingList.length ? "Funding:\n"+fundingList.join("\n") : ""}
 `;
 
 });
