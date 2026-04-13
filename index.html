@@ -6,10 +6,10 @@
 
 <style>
 body {
-  font-family: 'Segoe UI', Arial;
-  background: #0a0a0a;
-  color: #fff;
-  padding: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial;
+  background: #f4f4f5;
+  color: #111;
+  padding: 50px;
 }
 
 /* CONTAINER */
@@ -18,14 +18,15 @@ body {
   margin: auto;
 }
 
-/* GLASS EFFECT */
+/* GLASS CARD */
 .glass {
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.75);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 28px;
-  margin-bottom: 20px;
+  border-radius: 18px;
+  padding: 30px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
 }
 
 /* HEADER */
@@ -36,82 +37,91 @@ body {
 }
 
 .logo {
-  height: 100px;
+  height: 95px;
+}
+
+h2 {
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 /* INPUTS */
 input {
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
-  color: #fff;
-  margin: 6px 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  color: #111;
+  margin: 6px 6px 6px 0;
   width: 220px;
+  font-size: 14px;
 }
 
 input::placeholder {
-  color: rgba(255,255,255,0.4);
+  color: #999;
 }
 
 /* BUTTONS */
 button {
   padding: 12px 20px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.06);
+  border: none;
+  background: #111;
   color: #fff;
   cursor: pointer;
-  transition: 0.25s ease;
+  font-size: 14px;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 button:hover {
-  background: rgba(255,255,255,0.15);
+  background: #333;
   transform: translateY(-1px);
 }
 
 /* SECTION TITLE */
 .section-title {
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 14px;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
-/* DATA BLOCK */
+/* GRID */
 .data-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
+/* DATA CARD */
 .data-item {
-  background: rgba(255,255,255,0.03);
-  padding: 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.05);
 }
 
 .data-label {
   font-size: 12px;
-  color: rgba(255,255,255,0.5);
+  color: #777;
 }
 
 .data-value {
-  font-size: 16px;
-  margin-top: 4px;
+  font-size: 18px;
   font-weight: 600;
+  margin-top: 6px;
 }
 
 /* WEEKLY RANGE */
 #weeklyRange {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.05);
 }
 </style>
 </head>
@@ -122,7 +132,7 @@ button:hover {
 
 <!-- HEADER -->
 <div class="glass header">
-  <h2 style="font-weight:500;">Account Performance Checker</h2>
+  <h2>Account Performance Checker</h2>
   <img src="logo.png" class="logo">
 </div>
 
@@ -157,7 +167,7 @@ button:hover {
 
 <script>
 
-// ===== SAME LOGIC (UNCHANGED) =====
+// ===== LOGIC (UNCHANGED) =====
 
 let rows=[];
 
@@ -219,8 +229,7 @@ if(!first) return alert("No closed trades found");
 let firstDate=new Date(first["Close date"]);
 let today=new Date();
 
-// ===== ACCOUNT DETAILS =====
-
+// ACCOUNT DETAILS
 let closedTotal=getClosed(onboard,today);
 let depositTotal=getDeposits(new Date("2000-01-01"),today);
 let balance=depositTotal - closedTotal;
@@ -243,8 +252,7 @@ document.getElementById("overview").innerHTML=`
 </div>
 `;
 
-// ===== TIMEFRAME =====
-
+// TIMEFRAME
 let start,end,title="";
 
 if(type==="weekly"){
