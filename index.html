@@ -18,7 +18,6 @@ body {
   backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 25px;
-  border: 1px solid rgba(255,255,255,0.1);
   margin-bottom: 20px;
 }
 
@@ -49,9 +48,13 @@ button {
 }
 button:hover { background: rgba(255,255,255,0.25); }
 
+.section-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
 table {
   width: 100%;
-  margin-top: 20px;
   border-collapse: collapse;
 }
 th, td {
@@ -88,8 +91,9 @@ th, td {
   <button onclick="run('90')">90 Days</button>
 </div>
 
-<div id="result" class="glass"></div>
-<div id="monthlyTable" class="glass"></div>
+<div id="overview" class="glass"></div>
+<div id="breakdown" class="glass"></div>
+<div id="monthly" class="glass"></div>
 
 </div>
 
@@ -97,67 +101,64 @@ th, td {
 
 let rows = [];
 
-function parseCSV(text) {
-  const lines = text.split("\n").filter(l => l.trim());
+function parseCSV(text){
+  const lines = text.split("\n").filter(l=>l.trim());
   const headers = lines[1].split(",");
 
-  return lines.slice(2).map(line => {
+  return lines.slice(2).map(line=>{
     const values = line.split(",");
-    let obj = {};
-    headers.forEach((h,i)=>obj[h.trim()] = values[i]?.trim());
+    let obj={};
+    headers.forEach((h,i)=>obj[h.trim()]=values[i]?.trim());
     return obj;
   });
 }
 
 function loadFile(cb){
-  const file = document.getElementById("fileInput").files[0];
+  const file=document.getElementById("fileInput").files[0];
   if(!file) return alert("Upload CSV");
 
-  const reader = new FileReader();
-  reader.onload = e=>{
-    rows = parseCSV(e.target.result).sort((a,b)=> new Date(a["Close date"]) - new Date(b["Close date"]));
+  const reader=new FileReader();
+  reader.onload=e=>{
+    rows=parseCSV(e.target.result).sort((a,b)=> new Date(a["Close date"]) - new Date(b["Close date"]));
     cb();
   };
   reader.readAsText(file);
 }
 
-// ===== CORRECT TIMELINE =====
-function buildTimeline(onboard){
+// ===== BUILD BALANCE ENGINE =====
+function getBalanceAt(date, onboard){
 
-  let totalDeposit = 0;
-  let cumulativeProfit = 0;
-  let timeline = [];
+  let balance = 0;
 
   rows.forEach(r=>{
+    let d=new Date(r["Close date"]);
+    if(d<onboard || d>date) return;
 
-    let d = new Date(r["Close date"]);
-    let profit = Number(r["Net profit"]) || 0;
-    let type = r.Type?.toLowerCase() || "";
+    let p=Number(r["Net profit"])||0;
+    let type=r.Type?.toLowerCase()||"";
 
-    if(d < onboard) return;
-
-    if(type.includes("deposit")){
-      totalDeposit += profit;
-    }
-
-    if(r.Type !== "Open position" && !type.includes("deposit") && !type.includes("withdraw")){
-      cumulativeProfit += profit;
-    }
-
-    let balance = totalDeposit + cumulativeProfit;
-
-    timeline.push({ date:d, balance });
+    if(type.includes("deposit")) balance+=p;
+    else if(type.includes("withdraw")) balance+=p; // negative already
+    else if(r.Type!=="Open position") balance+=p;
   });
 
-  return { timeline, totalDeposit };
+  return balance;
 }
 
-function getBalanceAt(timeline, target){
-  let b = 0;
-  timeline.forEach(t=>{
-    if(t.date <= target) b = t.balance;
+function getClosedProfit(start,end){
+  let total=0;
+
+  rows.forEach(r=>{
+    let d=new Date(r["Close date"]);
+    if(d>=start && d<=end && r.Type!=="Open position"){
+      let type=r.Type?.toLowerCase()||"";
+      if(!type.includes("deposit") && !type.includes("withdraw")){
+        total += Number(r["Net profit"])||0;
+      }
+    }
   });
-  return b;
+
+  return total;
 }
 
 function getFloating(){
@@ -165,64 +166,48 @@ function getFloating(){
              .reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
+function getFirstClose(onboard){
+  return rows.find(r => new Date(r["Close date"]) >= onboard && r.Type !== "Open position");
+}
+
 // ===== MONTHLY =====
 function calcMonthly(onboard){
 
-  let balance = 0;
-  let months = {};
+  let months={};
 
   rows.forEach(r=>{
     let d=new Date(r["Close date"]);
     if(d<onboard || r.Type==="Open position") return;
 
-    let p=Number(r["Net profit"])||0;
-    let type=r.Type?.toLowerCase()||"";
-
-    if(type.includes("deposit")) balance += p;
-    if(!type.includes("deposit") && !type.includes("withdraw")) balance += p;
-
     let key=`${d.getFullYear()}-${d.getMonth()+1}`;
 
     if(!months[key]){
-      months[key]={start:balance-p,end:balance,peak:balance,maxDD:0,wins:0,trades:0};
+      let start = getBalanceAt(new Date(d.getFullYear(), d.getMonth(), 1), onboard);
+      let end = getBalanceAt(new Date(d.getFullYear(), d.getMonth()+1, 0), onboard);
+
+      let profit = end - start;
+      let pct = start ? (profit/start)*100 : 0;
+
+      months[key]={start,end,profit,pct};
     }
-
-    let m=months[key];
-
-    if(balance>m.peak) m.peak=balance;
-    let dd=((m.peak-balance)/m.peak)*100;
-    if(dd>m.maxDD) m.maxDD=dd;
-
-    if(!type.includes("deposit") && !type.includes("withdraw")){
-      m.trades++;
-      if(p>0) m.wins++;
-    }
-
-    m.end=balance;
   });
 
-  let html=`<h3>Monthly Performance</h3><table>
-  <tr><th>Month</th><th>Start</th><th>End</th><th>Profit</th><th>%</th><th>Max DD</th><th>Win Rate</th></tr>`;
+  let html=`<div class="section-title">Monthly Performance</div>
+  <table><tr><th>Month</th><th>Start</th><th>End</th><th>Profit</th><th>%</th></tr>`;
 
   Object.keys(months).forEach(k=>{
     let m=months[k];
-    let profit=m.end-m.start;
-    let pct=m.start? (profit/m.start)*100:0;
-    let wr=m.trades? (m.wins/m.trades)*100:0;
-
     html+=`<tr>
       <td>${k}</td>
       <td>${m.start.toFixed(2)}</td>
       <td>${m.end.toFixed(2)}</td>
-      <td>${profit.toFixed(2)}</td>
-      <td>${pct.toFixed(2)}%</td>
-      <td>${m.maxDD.toFixed(2)}%</td>
-      <td>${wr.toFixed(2)}%</td>
+      <td>${m.profit.toFixed(2)}</td>
+      <td>${m.pct.toFixed(2)}%</td>
     </tr>`;
   });
 
   html+=`</table>`;
-  document.getElementById("monthlyTable").innerHTML=html;
+  document.getElementById("monthly").innerHTML=html;
 }
 
 // ===== MAIN =====
@@ -230,68 +215,59 @@ function run(type){
 
 loadFile(()=>{
 
-  const onboard = new Date(document.getElementById("onboarding").value);
-  const first = rows.find(r => new Date(r["Close date"]) >= onboard && r.Type !== "Open position");
-
+  const onboard=new Date(document.getElementById("onboarding").value);
+  const first=getFirstClose(onboard);
   if(!first) return alert("No trades");
 
-  let firstDate = new Date(first["Close date"]);
+  let firstDate=new Date(first["Close date"]);
+  let today=new Date();
 
-  let { timeline, totalDeposit } = buildTimeline(onboard);
+  // ===== OVERVIEW =====
+  let currentBalance = getBalanceAt(today,onboard);
+  let initialBalance = getBalanceAt(firstDate,onboard);
+  let closedTotal = getClosedProfit(onboard,today);
   let floating = getFloating();
-  let today = new Date();
+  let growth = initialBalance ? ((currentBalance-initialBalance)/initialBalance)*100:0;
+  let track = Math.floor((today-firstDate)/(1000*60*60*24));
+
+  document.getElementById("overview").innerHTML=`
+    <div class="section-title">Account Overview</div>
+    Balance: ${currentBalance.toFixed(2)}<br>
+    Closed Profits: ${closedTotal.toFixed(2)}<br>
+    Floating P/L: ${floating.toFixed(2)}<br>
+    Growth: ${growth.toFixed(2)}%<br>
+    Track Record: ${track} days
+  `;
+
+  // ===== TIMEFRAME =====
+  let start,end;
 
   if(type==="weekly"){
-
-    let currentBalance = getBalanceAt(timeline, today);
-    let growth = totalDeposit ? ((currentBalance-totalDeposit)/totalDeposit)*100:0;
-    let track = Math.floor((today-firstDate)/(1000*60*60*24));
-
-    document.getElementById("result").innerHTML=`
-    <b>Track Record:</b> ${track} days<br>
-    <b>Balance:</b> ${currentBalance.toFixed(2)}<br>
-    <b>Deposit:</b> ${totalDeposit.toFixed(2)}<br>
-    <b>Growth:</b> ${growth.toFixed(2)}%<br>
-    <b>Floating:</b> ${floating.toFixed(2)}
-    `;
+    document.getElementById("weeklyRange").style.display="block";
+    start=new Date(document.getElementById("weekStart").value);
+    end=new Date(document.getElementById("weekEnd").value);
+  } else {
+    document.getElementById("weeklyRange").style.display="none";
   }
 
-  if(type==="30"||type==="60"||type==="90"){
+  if(type==="30"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+30); }
+  if(type==="60"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+60); }
+  if(type==="90"){ start=firstDate; end=new Date(firstDate); end.setDate(end.getDate()+90); }
 
-    let days = Number(type);
-    let end = new Date(firstDate);
-    end.setDate(firstDate.getDate()+days);
+  let startBal = getBalanceAt(start,onboard);
+  let endBal = getBalanceAt(end,onboard);
+  let closed = getClosedProfit(start,end);
+  let growthTF = startBal ? ((endBal-startBal)/startBal)*100:0;
+  let trackTF = Math.floor((end-start)/(1000*60*60*24));
 
-    let startBal = getBalanceAt(timeline, firstDate);
-    let endBal = getBalanceAt(timeline, end);
-
-    let profit = endBal-startBal;
-    let growth = startBal? (profit/startBal)*100:0;
-    let track = Math.floor((end-firstDate)/(1000*60*60*24));
-
-    let extra="";
-
-    if(type==="60"){
-      let end30=new Date(firstDate); end30.setDate(firstDate.getDate()+30);
-      let bal30=getBalanceAt(timeline,end30);
-      let g30=startBal?((bal30-startBal)/startBal)*100:0;
-      extra=`<br><b>30d vs 60d:</b> ${g30.toFixed(2)}% → ${growth.toFixed(2)}%`;
-    }
-
-    if(type==="90"){
-      extra=`<br><b>Overall Growth:</b> ${growth.toFixed(2)}%`;
-    }
-
-    document.getElementById("result").innerHTML=`
-    <b>Track Record:</b> ${track} days<br>
-    <b>Start Balance:</b> ${startBal.toFixed(2)}<br>
-    <b>End Balance:</b> ${endBal.toFixed(2)}<br>
-    <b>Closed Profit:</b> ${profit.toFixed(2)}<br>
-    <b>Growth:</b> ${growth.toFixed(2)}%<br>
-    <b>Floating:</b> ${floating.toFixed(2)}
-    ${extra}
-    `;
-  }
+  document.getElementById("breakdown").innerHTML=`
+    <div class="section-title">Breakdown (${type})</div>
+    Balance: ${endBal.toFixed(2)}<br>
+    Closed Profits: ${closed.toFixed(2)}<br>
+    Floating P/L: ${floating.toFixed(2)}<br>
+    Growth: ${growthTF.toFixed(2)}%<br>
+    Track Record: ${trackTF} days
+  `;
 
   calcMonthly(onboard);
 
