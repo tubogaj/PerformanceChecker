@@ -36,7 +36,6 @@ input {
   border-radius: 10px;
   border: 1px solid rgba(0,0,0,0.08);
   background: #fff;
-  color: #111;
   margin: 6px;
 }
 
@@ -72,7 +71,7 @@ button:hover { background: #333; }
 }
 
 .data-label { font-size: 12px; color: #777; }
-.data-value { font-size: 18px; font-weight: 600; margin-top: 6px; }
+.data-value { font-size: 18px; font-weight: 600; }
 
 #weeklyRange {
   margin-top: 14px;
@@ -80,6 +79,12 @@ button:hover { background: #333; }
   border-radius: 12px;
   background: #fff;
   border: 1px solid rgba(0,0,0,0.05);
+}
+
+.funding {
+  margin-top: 15px;
+  font-size: 13px;
+  color: #444;
 }
 </style>
 </head>
@@ -96,7 +101,6 @@ button:hover { background: #333; }
 <div class="glass">
 <input type="file" id="fileInput" accept=".csv"><br>
 
-<input type="text" id="name" placeholder="Client Name">
 <input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
@@ -124,7 +128,6 @@ End: <input type="date" id="weekEnd">
 let rows=[];
 let ghlText="";
 
-// ===== PARSE =====
 function parseCSV(text){
   const lines=text.split("\n").filter(l=>l.trim());
   const headers=lines[1].split(",");
@@ -149,65 +152,46 @@ function loadFile(cb){
   reader.readAsText(file);
 }
 
-// ===== CALCS =====
-function getClosed(start,end){
+function filterRows(type,start,end){
   return rows.filter(r=>{
     let d=new Date(r["Close date"]);
-    return r.Type==="Closed position" && d>=start && d<=end;
-  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
+    return r.Type===type && d>=start && d<=end;
+  });
 }
 
-function getDeposits(start,end){
-  return rows.filter(r=>{
-    let d=new Date(r["Close date"]);
-    return r.Type==="Deposit" && d>=start && d<=end;
-  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
-}
-
-function getWithdrawals(start,end){
-  return rows.filter(r=>{
-    let d=new Date(r["Close date"]);
-    return r.Type==="Withdrawal" && d>=start && d<=end;
-  }).reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
-}
-
-function getFloating(){
-  return rows.filter(r=>r.Type==="Open position")
-    .reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
+function sum(rows){
+  return rows.reduce((s,r)=>s+(Number(r["Net profit"])||0),0);
 }
 
 function getFirstClose(onboard){
   let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard);
-  if(!trades.length) return null;
   trades.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]));
   return trades[0];
 }
 
-// ===== MAIN =====
 function run(type){
 
 loadFile(()=>{
 
-const name=document.getElementById("name").value||"Client";
 const software=document.getElementById("software").value||"N/A";
-
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
-if(!first) return alert("No closed trades found");
+if(!first) return alert("No trades");
 
 let firstDate=new Date(first["Close date"]);
 let today=new Date();
 
-let closedTotal=getClosed(onboard,today);
-let deposits=getDeposits(new Date("2000-01-01"),today);
-let withdrawals=getWithdrawals(new Date("2000-01-01"),today);
+// ===== ACCOUNT DETAILS =====
+let closedTotal=sum(filterRows("Closed position",onboard,today));
+let depTotal=sum(filterRows("Deposit",new Date("2000-01-01"),today));
+let wdTotal=sum(filterRows("Withdrawal",new Date("2000-01-01"),today));
 
-let balance=deposits + closedTotal - withdrawals;
-let floating=getFloating();
+let balance=depTotal + closedTotal - wdTotal;
+let floating=sum(rows.filter(r=>r.Type==="Open position"));
 
-let initialDeposit=getDeposits(new Date("2000-01-01"),onboard);
-let growthVal=balance-initialDeposit;
-let growthPct=initialDeposit?(growthVal/initialDeposit)*100:0;
+let initialDep=sum(filterRows("Deposit",new Date("2000-01-01"),onboard));
+let growthVal=balance-initialDep;
+let growthPct=initialDep?(growthVal/initialDep)*100:0;
 
 let track=Math.floor((today-firstDate)/(1000*60*60*24));
 
@@ -216,23 +200,22 @@ document.getElementById("overview").innerHTML=`
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${balance.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closedTotal.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})</div></div>
 <div class="data-item"><div class="data-label">Track Record</div><div class="data-value">${track} days</div></div>
 <div class="data-item"><div class="data-label">1st Trade Closed</div><div class="data-value">${firstDate.toLocaleDateString()}</div></div>
 </div>
 `;
 
-// ===== BREAKDOWN =====
-let start,end,title="";
+// ===== TIMEFRAME =====
+let start,end,title;
 
 if(type==="weekly"){
 document.getElementById("weeklyRange").style.display="block";
 start=new Date(document.getElementById("weekStart").value);
 end=new Date(document.getElementById("weekEnd").value);
 title=`Weekly (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`;
-}
-else{
+}else{
 document.getElementById("weeklyRange").style.display="none";
 let days=Number(type);
 start=firstDate;
@@ -241,31 +224,51 @@ end.setDate(end.getDate()+days);
 title=`${days} Days`;
 }
 
-let closed=getClosed(start,end);
-let dep=getDeposits(start,end);
-let wd=getWithdrawals(start,end);
+// ===== PERFORMANCE =====
+let closed=sum(filterRows("Closed position",start,end));
+let dep=sum(filterRows("Deposit",start,end));
+let wd=sum(filterRows("Withdrawal",start,end));
+
 let bal=dep + closed - wd;
-let growthTF=initialDeposit?((bal-initialDeposit)/initialDeposit)*100:0;
+let growthValTF=bal - dep;
+let growthPctTF=dep?(growthValTF/dep)*100:0;
+
+// FUNDING LIST
+let fundingRows=rows.filter(r=>{
+  let d=new Date(r["Close date"]);
+  return (r.Type==="Deposit" || r.Type==="Withdrawal") && d>=start && d<=end;
+});
+
+let fundingHTML = fundingRows.length
+  ? fundingRows.map(r=>{
+      let amt=Number(r["Net profit"])||0;
+      let label=amt>=0?"Deposit":"Withdrawal";
+      return `${r["Close date"]} → ${label} (${amt})`;
+    }).join("<br>")
+  : "None";
 
 document.getElementById("breakdown").innerHTML=`
 <div class="section-title">Account Performance (${title})</div>
 <div class="data-grid">
 <div class="data-item"><div class="data-label">Balance</div><div class="data-value">${bal.toFixed(2)}</div></div>
 <div class="data-item"><div class="data-label">Closed Profits</div><div class="data-value">${closed.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Floating P/L</div><div class="data-value">${floating.toFixed(2)}</div></div>
-<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthTF.toFixed(2)}%</div></div>
+<div class="data-item"><div class="data-label">Floating</div><div class="data-value">${floating.toFixed(2)}</div></div>
+<div class="data-item"><div class="data-label">Growth</div><div class="data-value">${growthPctTF.toFixed(2)}% (${growthValTF.toFixed(2)})</div></div>
+</div>
+
+<div class="funding">
+<b>Funding Activity:</b><br>${fundingHTML}
 </div>
 `;
 
-// ===== GHL TEXT =====
+// ===== GHL =====
 ghlText = `
-Client: ${name}
 Software: ${software}
 
 --- ACCOUNT DETAILS ---
 Balance: ${balance.toFixed(2)}
 Closed Profits: ${closedTotal.toFixed(2)}
-Floating P/L: ${floating.toFixed(2)}
+Floating: ${floating.toFixed(2)}
 Growth: ${growthPct.toFixed(2)}% (${growthVal.toFixed(2)})
 Track Record: ${track} days
 1st Trade Closed: ${firstDate.toLocaleDateString()}
@@ -273,8 +276,11 @@ Track Record: ${track} days
 --- PERFORMANCE (${title}) ---
 Balance: ${bal.toFixed(2)}
 Closed Profits: ${closed.toFixed(2)}
-Floating P/L: ${floating.toFixed(2)}
-Growth: ${growthTF.toFixed(2)}%
+Floating: ${floating.toFixed(2)}
+Growth: ${growthPctTF.toFixed(2)}% (${growthValTF.toFixed(2)})
+
+Funding:
+${fundingHTML.replace(/<br>/g,"\n")}
 `;
 
 });
@@ -282,9 +288,9 @@ Growth: ${growthTF.toFixed(2)}%
 }
 
 function copyNote(){
-  if(!ghlText) return alert("Run analysis first");
-  navigator.clipboard.writeText(ghlText);
-  alert("Copied to clipboard!");
+if(!ghlText) return alert("Run first");
+navigator.clipboard.writeText(ghlText);
+alert("Copied!");
 }
 
 </script>
