@@ -153,7 +153,6 @@ function getFirstClose(onboard){
     .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
-// ✅ SINGLE TRACK RECORD CALCULATOR
 function calculateDuration(start, end){
   return Math.floor((end - start)/(1000*60*60*24));
 }
@@ -229,6 +228,50 @@ document.getElementById("overview").innerHTML=`
 `;
 }
 
+// ===== CORPORATE 30 DAY NARRATIVE =====
+function generate30DayNarrative(start, end){
+
+let trades = rows.filter(r =>
+  r.Type==="Closed position" &&
+  new Date(r["Close date"])>=start &&
+  new Date(r["Close date"])<=end
+);
+
+let profits = trades.map(r=>Number(r["Net profit"])||0);
+
+let totalTrades = trades.length;
+let totalProfit = profits.reduce((a,b)=>a+b,0);
+
+let running = 0;
+let peak = 0;
+let drawdownOccurred = false;
+
+profits.forEach(p=>{
+  running += p;
+  if(running > peak) peak = running;
+  if(running < peak) drawdownOccurred = true;
+});
+
+let recovered = running >= peak;
+
+let narrative = `
+<div style="margin-top:20px">
+  <div class="section-title">30 Day Performance Commentary</div>
+  <div class="data-item" style="line-height:1.6">
+
+  Over the initial 30-day period following onboarding, the account ${drawdownOccurred ? "experienced periods of drawdown" : "maintained relatively stable performance without material drawdown"}. 
+  ${drawdownOccurred ? (recovered ? "The system demonstrated the ability to recover from these drawdowns and stabilize performance levels." : "While recovery efforts were observed, the account has not fully retraced prior drawdown levels within this period.") : ""}
+  
+  A total of ${totalTrades} trades were executed during this timeframe, resulting in a net performance that is ${totalProfit >= 0 ? "positive" : "negative"} overall. 
+  ${totalProfit >= 0 ? "Performance indicates that the strategy has been able to navigate market conditions effectively within the observed period." : "Performance remains under pressure, reflecting challenging market conditions during the evaluation window."}
+
+  </div>
+</div>
+`;
+
+return narrative;
+}
+
 // ===== ACTIONS =====
 
 function showWeekly(){
@@ -256,6 +299,13 @@ if(type==="weekly"){
 }
 
 processResult(start, end, title);
+
+// ✅ ADD NARRATIVE FOR 30 DAYS
+if(type==="30"){
+  const narrative = generate30DayNarrative(start, end);
+  document.getElementById("breakdown").innerHTML += narrative;
+}
+
 }
 
 function runDetailed(){
@@ -271,7 +321,8 @@ end.setDate(end.getDate()-1);
 processResult(start, end, "Detailed Review");
 }
 
-// ✅ CENTRALIZED CALCULATION
+// ===== CENTRAL CALC =====
+
 function processResult(start, end, title){
 
 let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
