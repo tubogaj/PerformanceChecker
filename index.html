@@ -123,31 +123,73 @@ let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
 let growth=startBal?(total/startBal)*100:0;
 
-return {trades,profits,total,startBal,endBal,growth};
+return {trades,total,startBal,endBal,growth};
 }
 
-// ===== STORY =====
-function narrative(start,end,type){
+// ===== NARRATIVE =====
+function generateNarrative(start,end,type){
+
 let d = analyzePeriod(start,end);
+let isProfit = d.total >= 0;
 
-let third = Math.floor(d.profits.length/3);
-let early = sum(d.profits.slice(0,third));
-let mid = sum(d.profits.slice(third,third*2));
-let late = sum(d.profits.slice(third*2));
+let tone = isProfit
+? "The system delivered a positive performance during this period."
+: "The system closed this period at a net loss.";
 
-return `
-<div class="data-item">
-The account ${d.total>=0?"generated a net gain":"closed at a net loss"} over this period.
+if(type==="30"){
+return `<div class="data-item">
+${tone}
 
-Early phase: ${early>=0?"positive movement":"drawdown"} (${fmt(early)})  
-Mid phase: ${mid>=0?"stabilization/growth":"continued pressure"} (${fmt(mid)})  
-Late phase: ${late>=0?"recovery or continuation of gains":"limited recovery"} (${fmt(late)})
+During the first 30 days, the system executed ${d.trades.length} trades.
 
-Final balance: $${fmt(d.endBal)}  
-Total result: $${fmt(d.total)} (${d.growth.toFixed(2)}%)
+The account generated a closed result of $${fmt(d.total)}, reaching a balance of $${fmt(d.endBal)}, reflecting a growth of ${d.growth.toFixed(2)}%.
 
-This reflects the system’s natural cycle of fluctuation, execution, and recovery behavior.
+This initial phase typically includes fluctuations as positions are established, where drawdown and recovery cycles are expected.
+
+Performance remains dependent on prevailing market conditions, and short-term variability is part of the system’s normal behavior.
 </div>`;
+}
+
+if(type==="60"){
+
+let mid=new Date(start); mid.setDate(mid.getDate()+29);
+
+let first30 = analyzePeriod(start,mid);
+let next30 = analyzePeriod(mid,end);
+
+return `<div class="data-item">
+${tone}
+
+At the 60-day mark, the system begins to show more defined behavior.
+
+During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}.
+
+The account now stands at $${fmt(d.endBal)}, reflecting an overall performance of ${d.growth.toFixed(2)}%.
+
+This comparison highlights how the system progressed after the initial phase, showing how performance evolves as more positions are executed.
+
+While fluctuations may still occur, this stage typically reflects improved structure and clearer recovery behavior.
+
+Performance continues to depend on market conditions, and both positive and negative phases remain part of normal system operation.
+</div>`;
+}
+
+if(type==="90"){
+return `<div class="data-item">
+${tone}
+
+Over the 90-day period, the system has executed ${d.trades.length} trades, navigating multiple market conditions.
+
+The account reached $${fmt(d.endBal)}, generating a total result of $${fmt(d.total)}, equivalent to ${d.growth.toFixed(2)}% growth.
+
+This longer duration provides a more complete view of system behavior, where early-stage fluctuations transition into more consistent execution patterns.
+
+The performance observed aligns with expectations established during the initial 30-day phase, including periods of drawdown followed by recovery.
+
+Overall, this reflects a more stable and repeatable system behavior, although performance remains dependent on market conditions and ongoing variability should be expected.
+</div>`;
+}
+
 }
 
 // ===== ENGINE =====
@@ -170,12 +212,12 @@ let html=`
 if(type==="30"||type==="60"||type==="90"){
 html+=`<div style="margin-top:20px"></div>
 <div class="section-title">Performance Summary</div>
-${narrative(start,end,type)}`;
+${generateNarrative(start,end,type)}`;
 }
 
 document.getElementById("breakdown").innerHTML=html;
 
-let software = document.getElementById("software").value || "N/A";
+let software=document.getElementById("software").value||"N/A";
 
 ghlText=`Software: ${software}
 ${title}
@@ -234,7 +276,7 @@ Here is your ${lastStats.title} performance update for ${lastStats.software}.
 
 The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
 
-This includes normal phases of drawdown and recovery as part of system behavior.
+Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
 
 Best regards`;
 
@@ -249,7 +291,7 @@ const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let software = document.getElementById("software").value || "N/A";
+let software=document.getElementById("software").value||"N/A";
 
 let firstClose=new Date(first["Close date"]);
 let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
