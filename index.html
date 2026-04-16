@@ -153,7 +153,7 @@ function get(cond){
 function getFirstClose(onboard){
   return rows
     .filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard)
-    .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
+    .sort((a,b)=>new Date(r["Close date"])-new Date(b["Close date"]))[0];
 }
 
 function getBalanceAt(date){
@@ -211,7 +211,7 @@ This reflects the running performance of the account as of the last activity dat
 `;
 }
 
-// ✅ UPDATED DETAILED NARRATIVE
+// ===== NARRATIVE =====
 function generate30DayNarrative(start,end){
 
 let trades=rows.filter(r=>r.Type==="Closed position" &&
@@ -239,27 +239,23 @@ let recovered = running >= peak;
 let behaviorText="";
 if(drawdown){
   if(recovered){
-    behaviorText="The account experienced periods of drawdown during the cycle, followed by a recovery phase that allowed performance to stabilize toward the end of the period.";
+    behaviorText="The account experienced periods of drawdown, followed by recovery toward the end of the period.";
   } else {
-    behaviorText="The account experienced drawdown conditions during the period, with recovery still in progress toward the end of the evaluation window.";
+    behaviorText="The account experienced drawdown conditions, with recovery still in progress.";
   }
 } else {
-  behaviorText="Performance remained relatively stable throughout the period, with no significant drawdown observed.";
+  behaviorText="Performance remained stable with no significant drawdown.";
 }
 
-let resultText = totalProfit >= 0
-  ? "Overall, the account closed the period in positive territory."
-  : "Overall, the account closed the period under pressure.";
-
-let text = `Over the initial 30-day period following onboarding, the account executed a total of ${totalTrades} trades.
+let text=`Over the 30-day period, ${totalTrades} trades were executed.
 
 ${behaviorText}
 
-The total closed result for the period was $${fmt(totalProfit)}, with the account reaching a balance of $${fmt(endBal)}, reflecting a growth of ${growth30.toFixed(2)}%.
+Closed result: $${fmt(totalProfit)}. Ending balance: $${fmt(endBal)}. Growth: ${growth30.toFixed(2)}%.
 
-${resultText} Performance remains dependent on prevailing market conditions, where varying levels of volatility and directional movement can influence both drawdown phases and recovery cycles.`;
+Performance remains dependent on market conditions.`;
 
-ghlNarrative = text;
+ghlNarrative=text;
 
 return `<div style="margin-top:20px">
 <div class="section-title">30 Day Performance Commentary</div>
@@ -267,7 +263,105 @@ return `<div style="margin-top:20px">
 </div>`;
 }
 
-// everything else unchanged...
+// ===== MAIN ENGINE =====
+function processResult(start,end,title,type){
+
+let endBal=getBalanceAt(end);
+
+let closedTF=sum(get(r=>r.Type==="Closed position" &&
+new Date(r["Close date"])>=start &&
+new Date(r["Close date"])<=end));
+
+let startBal=getBalanceAt(start);
+let growthTF=startBal?(closedTF/startBal)*100:0;
+
+let duration;
+if(type==="30") duration=30;
+else if(type==="60") duration=60;
+else if(type==="90") duration=90;
+else duration=calculateDuration(start,end);
+
+let html=`<div class="section-title">${title}</div>
+<div class="data-grid">
+<div class="data-item">Balance: $${fmt(endBal)}</div>
+<div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
+<div class="data-item">Growth: ${growthTF.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${duration} days</div>
+</div>`;
+
+if(type==="30"){
+html+=generate30DayNarrative(start,end);
+}
+
+document.getElementById("breakdown").innerHTML=html;
+
+ghlText=`${title}
+
+Balance: $${fmt(endBal)}
+Closed Profit: $${fmt(closedTF)}
+Growth: ${growthTF.toFixed(2)}%
+Track Record: ${duration} days`;
+
+if(type==="30"){
+ghlText+=`\n\n${ghlNarrative}`;
+}
+
+lastStats={title,endBal,closedTF,growthTF,duration};
+}
+
+function run(type){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+let start=new Date(first["Close date"]);
+let end=new Date(start);
+end.setDate(end.getDate()+(Number(type)-1));
+
+processResult(start,end,`${type} Days`,type);
+}
+
+function runDetailed(){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+let start=new Date(first["Close date"]);
+let end=new Date();
+end.setDate(end.getDate()-1);
+
+processResult(start,end,"Detailed Review","detailed");
+}
+
+function copyNote(){
+if(!ghlText) return alert("Run first");
+navigator.clipboard.writeText(ghlText);
+alert("Copied");
+}
+
+function copyEmail(){
+
+if(!lastStats.title) return alert("Run a report first");
+
+let email=`Hi there,
+
+Here is a performance update for the ${lastStats.title} period.
+
+The account stands at $${fmt(lastStats.endBal)} with a closed result of $${fmt(lastStats.closedTF)}, reflecting ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
+
+Performance remains dependent on market conditions. Periods of drawdown and recovery are expected as the system adapts to market behavior.
+
+Please let me know if you need further details.
+
+Best regards`;
+
+navigator.clipboard.writeText(email);
+alert("Email copied");
+}
+
+function showWeekly(){
+document.getElementById("weeklyBox").classList.remove("hidden");
+}
 
 </script>
 
