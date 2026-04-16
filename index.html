@@ -153,11 +153,20 @@ function getFirstClose(onboard){
     .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
+// ✅ SINGLE TRACK RECORD CALCULATOR
+function calculateDuration(start, end){
+  return Math.floor((end - start)/(1000*60*60*24));
+}
+
 function renderAccount(){
 
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
+
+let startDate=new Date(first["Close date"]);
+let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let duration=calculateDuration(startDate, endDate);
 
 let dep=sum(get(r=>r.Type==="Deposit"));
 let wd=sum(get(r=>r.Type==="Withdrawal"));
@@ -166,10 +175,6 @@ let floating=sum(get(r=>r.Type==="Open position"));
 
 let bal=dep-wd+closed;
 let growth=dep?(closed/dep)*100:0;
-
-let startDate=new Date(first["Close date"]);
-let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-let duration=Math.floor((endDate-startDate)/(1000*60*60*24));
 
 document.getElementById("overview").innerHTML=`
 
@@ -224,72 +229,10 @@ document.getElementById("overview").innerHTML=`
 `;
 }
 
+// ===== ACTIONS =====
+
 function showWeekly(){
   document.getElementById("weeklyBox").classList.remove("hidden");
-}
-
-// 🔥 DETAILED REVIEW (START → YESTERDAY)
-function runDetailed(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let start=new Date(first["Close date"]);
-
-let end=new Date();
-end.setDate(end.getDate()-1); // yesterday
-
-let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
-let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
-let closedTotal=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
-
-let bal=dep-wd+closedTotal;
-
-let closedTF=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-
-let growthTF=dep?(closedTF/dep)*100:0;
-
-let durationDays=Math.floor((end - start)/(1000*60*60*24));
-
-document.getElementById("breakdown").innerHTML=`
-
-<div class="section-title">Detailed Review (Inception → Yesterday)</div>
-
-<div class="data-grid">
-
-  <div class="data-item">
-    <div class="section-title">Balance</div>
-    <h3>${bal.toFixed(2)}</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Closed Profit</div>
-    <h3>${closedTF.toFixed(2)}</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Growth</div>
-    <h3>${growthTF.toFixed(2)}%</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Track Record</div>
-    <h3>${durationDays} days</h3>
-  </div>
-
-</div>
-`;
-
-ghlText=`Software: ${document.getElementById("software").value}
-
-Detailed Review
-
-Balance: ${bal.toFixed(2)}
-Closed Profit: ${closedTF.toFixed(2)}
-Growth: ${growthTF.toFixed(2)}%
-Track Record: ${durationDays} days
-`;
 }
 
 function run(type){
@@ -298,21 +241,38 @@ const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let start,end,title;
+let start=new Date(first["Close date"]);
+let end,title;
 
 if(type==="weekly"){
-  start=new Date(document.getElementById("weekStart").value);
   end=new Date(document.getElementById("weekEnd").value);
-  if(!start || !end) return alert("Select dates");
+  if(!end) return alert("Select dates");
   title="Weekly";
 }else{
-  document.getElementById("weeklyBox").classList.add("hidden");
   let days=Number(type);
-  start=new Date(first["Close date"]);
   end=new Date(start);
   end.setDate(end.getDate()+(days-1));
   title=`${days} Days`;
 }
+
+processResult(start, end, title);
+}
+
+function runDetailed(){
+
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+let start=new Date(first["Close date"]);
+let end=new Date();
+end.setDate(end.getDate()-1);
+
+processResult(start, end, "Detailed Review");
+}
+
+// ✅ CENTRALIZED CALCULATION
+function processResult(start, end, title){
 
 let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
 let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
@@ -324,11 +284,11 @@ let closedTF=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])>
 
 let growthTF=dep?(closedTF/dep)*100:0;
 
-let durationDays=Math.floor((end - new Date(first["Close date"]))/(1000*60*60*24));
+let durationDays=calculateDuration(start,end);
 
 document.getElementById("breakdown").innerHTML=`
 
-<div class="section-title">Performance (${title})</div>
+<div class="section-title">${title}</div>
 
 <div class="data-grid">
 
@@ -357,7 +317,7 @@ document.getElementById("breakdown").innerHTML=`
 
 ghlText=`Software: ${document.getElementById("software").value}
 
-${title} Performance
+${title}
 
 Balance: ${bal.toFixed(2)}
 Closed Profit: ${closedTF.toFixed(2)}
