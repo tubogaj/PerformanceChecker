@@ -11,9 +11,7 @@ body {
   padding: 50px;
   color: #111;
 }
-
 .container { max-width:1100px;margin:auto; }
-
 .glass {
   background: rgba(255,255,255,0.75);
   backdrop-filter: blur(18px);
@@ -22,14 +20,12 @@ body {
   margin-bottom: 20px;
   border:1px solid rgba(0,0,0,0.05);
 }
-
 input {
   padding:10px;
   border-radius:8px;
   border:1px solid #ddd;
   margin:5px;
 }
-
 button {
   padding:10px 16px;
   border:none;
@@ -45,27 +41,18 @@ button:hover { background:#333; }
   grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
   gap:12px;
 }
-
 .data-item {
   background:#fff;
   padding:15px;
   border-radius:10px;
   border:1px solid #eee;
 }
-
 .section-title {
   font-size:13px;
   color:#666;
   margin-bottom:10px;
   text-transform:uppercase;
 }
-
-.note {
-  font-size:12px;
-  color:#777;
-  margin-top:10px;
-}
-
 h2 { font-size:28px;margin:0; }
 </style>
 </head>
@@ -79,27 +66,14 @@ h2 { font-size:28px;margin:0; }
 </div>
 
 <div class="glass">
-
 <input type="file" id="fileInput"><br>
-<input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
-
-<div id="weeklyBox" style="display:none">
-<input type="date" id="weekStart">
-<input type="date" id="weekEnd">
-<button onclick="runWeekly()">Run Weekly</button>
-</div>
 
 <br>
 
-<button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
-<button onclick="runDetailed()">Detailed Review</button>
-<button onclick="copyNote()">Copy GHL</button>
-<button onclick="copyEmail()">Copy Email</button>
-
 </div>
 
 <div id="overview" class="glass"></div>
@@ -110,8 +84,6 @@ h2 { font-size:28px;margin:0; }
 <script>
 
 let rows=[];
-let ghlText="";
-let lastStats={};
 
 const fmt = v => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -157,49 +129,7 @@ let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 return dep-wd+cl;
 }
 
-// ===== OVERVIEW =====
-function renderAccount(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let firstClose=new Date(first["Close date"]);
-let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-
-let duration=Math.floor((lastActivity-firstClose)/(1000*60*60*24))+1;
-
-let startBal=getBalanceAt(firstClose);
-let endBal=getBalanceAt(lastActivity);
-
-let closed=sum(get(r=>r.Type==="Closed position"));
-let growth=startBal?(closed/startBal)*100:0;
-
-document.getElementById("overview").innerHTML=`
-<div class="section-title">Overview</div>
-
-<div class="data-grid">
-<div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
-<div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
-<div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
-</div>
-
-<div style="margin-top:20px"></div>
-
-<div class="section-title">Account Details</div>
-
-<div class="data-grid">
-<div class="data-item">First Close Trade<br>${firstClose.toLocaleDateString()}</div>
-<div class="data-item">Last Activity Date<br>${lastActivity.toLocaleDateString()}</div>
-<div class="data-item">Track Record<br>${duration} days</div>
-</div>
-
-<div class="note">This reflects the running performance of the account as of the last activity date.</div>
-`;
-}
-
-// ===== NARRATIVE =====
-function generateNarrative(start,end,type){
+function analyzePeriod(start,end){
 
 let trades=rows.filter(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
@@ -212,84 +142,99 @@ let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
 let growth=startBal?(total/startBal)*100:0;
 
-let running=0,peak=0,drawdown=false;
+let running=0,peak=0,drawdown=false,maxDD=0;
 
 profits.forEach(p=>{
 running+=p;
 if(running>peak) peak=running;
-if(running<peak) drawdown=true;
+let dd = peak - running;
+if(dd>0) drawdown=true;
+if(dd>maxDD) maxDD=dd;
 });
 
-let recovered=running>=peak;
+let recovered = running >= peak;
 
-let behavior=drawdown
-? (recovered
-  ? "The account experienced drawdown followed by recovery toward the end of the period."
-  : "The account experienced drawdown with recovery still in progress.")
-: "The account maintained stable performance without significant drawdown.";
+return {trades,total,startBal,endBal,growth,drawdown,recovered,maxDD};
+}
+
+// ===== COMMENTARY ENGINE =====
+function generateNarrative(start,end,type){
+
+let data = analyzePeriod(start,end);
+let isProfit = data.total >= 0;
+
+function behaviorText(){
+if(!data.drawdown) return "The period showed relatively stable execution with minimal drawdown.";
+if(data.drawdown && data.recovered) return "The account experienced drawdown followed by a recovery phase.";
+return "The account is currently in a drawdown phase, with recovery still developing.";
+}
+
+function toneIntro(){
+if(isProfit) return "The system delivered a positive result during this period.";
+return "The system closed this period at a net loss.";
+}
+
+if(type==="30"){
+return `
+<div class="data-item">
+${toneIntro()}
+
+During the first 30 days, ${data.trades.length} trades were executed.
+
+${behaviorText()}
+
+The account closed at $${fmt(data.endBal)}, with a result of $${fmt(data.total)} (${data.growth.toFixed(2)}%).
+
+This phase represents the system’s initial behavior, where fluctuations, including drawdown, are expected as positions develop.
+</div>`;
+}
+
+if(type==="60"){
+
+let mid=new Date(start);
+mid.setDate(mid.getDate()+29);
+
+let first30 = analyzePeriod(start,mid);
+let next30 = analyzePeriod(mid,end);
 
 return `
-<div style="margin-top:20px">
-<div class="section-title">${type} Day Performance Commentary</div>
 <div class="data-item">
+${toneIntro()}
 
-During this period, ${trades.length} trades were executed.
+Comparing periods, the first 30 days produced $${fmt(first30.total)}, while the following 30 days resulted in $${fmt(next30.total)}.
 
-${behavior}
+This shows how the system has progressed as it continued operating.
 
-The account generated a closed result of $${fmt(total)}, reaching a balance of $${fmt(endBal)}, reflecting a growth of ${growth.toFixed(2)}%.
+The account now stands at $${fmt(data.endBal)}, reflecting ${data.growth.toFixed(2)}% overall performance.
 
-Performance remains dependent on prevailing market conditions, where both drawdown and recovery phases are part of the system’s normal behavior.
+${behaviorText()}
 
-</div></div>`;
+At this stage, it is common to see either stabilization after early volatility or continued drawdown before recovery develops.
+</div>`;
 }
 
-// ===== ENGINE =====
-function processResult(start,end,title,type){
+if(type==="90"){
+return `
+<div class="data-item">
+${toneIntro()}
 
-let endBal=getBalanceAt(end);
+Over the 90-day period, the system has gone through multiple market phases, including both favorable and unfavorable conditions.
 
-let closedTF=sum(get(r=>r.Type==="Closed position" &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end));
+The account stands at $${fmt(data.endBal)}, with a total result of $${fmt(data.total)} (${data.growth.toFixed(2)}%).
 
-let startBal=getBalanceAt(start);
-let growthTF=startBal?(closedTF/startBal)*100:0;
+${behaviorText()}
 
-let duration =
-type==="30"?30:
-type==="60"?60:
-type==="90"?90:
-Math.floor((end-start)/(1000*60*60*24))+1;
+This longer duration provides a clearer view of system behavior, where early-stage volatility transitions into more observable performance patterns.
 
-let html=`
-<div class="section-title">${title}</div>
-
-<div class="data-grid">
-<div class="data-item">Balance: $${fmt(endBal)}</div>
-<div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
-<div class="data-item">Growth: ${growthTF.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${duration} days</div>
-</div>
-`;
-
-if(type==="30"||type==="60"||type==="90"){
-html+=generateNarrative(start,end,type);
+Whether in profit or drawdown, the results reflect the system’s natural cycle of fluctuation, execution, and potential recovery over time.
+</div>`;
 }
 
-document.getElementById("breakdown").innerHTML=html;
-
-ghlText=`${title}
-Balance: $${fmt(endBal)}
-Closed Profit: $${fmt(closedTF)}
-Growth: ${growthTF.toFixed(2)}%
-Track Record: ${duration} days`;
-
-lastStats={title,endBal,closedTF,growthTF,duration};
 }
 
-// ===== BUTTONS =====
+// ===== RUN =====
 function run(type){
+
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
@@ -298,53 +243,51 @@ let start=new Date(first["Close date"]);
 let end=new Date(start);
 end.setDate(end.getDate()+(Number(type)-1));
 
-processResult(start,end,type+" Days",type);
+let data = analyzePeriod(start,end);
+
+let html=`
+<div class="section-title">${type} Day Performance</div>
+
+<div class="data-grid">
+<div class="data-item">Balance: $${fmt(data.endBal)}</div>
+<div class="data-item">Closed Profit: $${fmt(data.total)}</div>
+<div class="data-item">Growth: ${data.growth.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${type} days</div>
+</div>
+
+<div style="margin-top:20px"></div>
+
+<div class="section-title">Commentary</div>
+${generateNarrative(start,end,type)}
+`;
+
+document.getElementById("breakdown").innerHTML=html;
 }
 
-function runWeekly(){
-let start=new Date(document.getElementById("weekStart").value);
-let end=new Date(document.getElementById("weekEnd").value);
-processResult(start,end,"Weekly","weekly");
-}
+// ===== OVERVIEW =====
+function renderAccount(){
 
-function runDetailed(){
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let start=new Date(first["Close date"]);
-let end=new Date();
+let firstClose=new Date(first["Close date"]);
+let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-processResult(start,end,"Detailed Review","detailed");
-}
+let duration=Math.floor((lastActivity-firstClose)/(1000*60*60*24))+1;
 
-function copyNote(){
-if(!ghlText) return alert("Run first");
-navigator.clipboard.writeText(ghlText);
-alert("Copied");
-}
+let endBal=getBalanceAt(lastActivity);
+let closed=sum(get(r=>r.Type==="Closed position"));
 
-function copyEmail(){
-if(!lastStats.title) return alert("Run report first");
+document.getElementById("overview").innerHTML=`
+<div class="section-title">Overview</div>
 
-let email=`Hi,
-
-Here is the performance update for ${lastStats.title}.
-
-The account stands at $${fmt(lastStats.endBal)} with a closed result of $${fmt(lastStats.closedTF)}, reflecting ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
-
-Performance remains dependent on market conditions, where drawdown and recovery cycles are part of normal system behavior.
-
-Please let me know if you would like further details.
-
-Best regards`;
-
-navigator.clipboard.writeText(email);
-alert("Copied");
-}
-
-function showWeekly(){
-document.getElementById("weeklyBox").style.display="block";
+<div class="data-grid">
+<div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
+<div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
+<div class="data-item">Track Record<br>${duration} days</div>
+</div>
+`;
 }
 
 </script>
