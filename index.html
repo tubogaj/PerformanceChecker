@@ -67,7 +67,6 @@ button:hover { background:#333; }
 
 h2 { font-size:28px;margin:0; }
 h3 { font-size:22px;margin:0; }
-
 </style>
 </head>
 
@@ -112,7 +111,6 @@ h3 { font-size:22px;margin:0; }
 
 let rows=[];
 let ghlText="";
-let ghlNarrative="";
 let lastStats={};
 
 const fmt = (v) => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -167,66 +165,8 @@ function calculateDuration(start,end){
   return Math.floor((end-start)/(1000*60*60*24))+1;
 }
 
-function renderAccount(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let startDate=new Date(first["Close date"]);
-let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-
-let startBal=getBalanceAt(startDate);
-let endBal=getBalanceAt(endDate);
-
-let closed=sum(get(r=>r.Type==="Closed position"));
-let floating=sum(get(r=>r.Type==="Open position"));
-
-let growth=startBal?(closed/startBal)*100:0;
-let duration=calculateDuration(startDate,endDate);
-
-document.getElementById("overview").innerHTML=`
-<div class="section-title">Overview</div>
-
-<div class="data-grid">
-<div class="data-item"><div class="section-title">Balance</div><h2>$${fmt(endBal)}</h2></div>
-<div class="data-item"><div class="section-title">Growth</div><h2>${growth.toFixed(2)}%</h2></div>
-<div class="data-item"><div class="section-title">Closed Profit</div><strong>$${fmt(closed)}</strong></div>
-<div class="data-item"><div class="section-title">Floating</div><strong>$${fmt(floating)}</strong></div>
-</div>
-
-<div class="note">
-This reflects the running performance of the account as of the last activity date.
-</div>
-
-<div style="margin-top:20px"></div>
-
-<div class="section-title">Track Record</div>
-
-<div class="data-grid">
-<div class="data-item">Start: ${startDate.toLocaleDateString()}</div>
-<div class="data-item">Last Activity: ${endDate.toLocaleDateString()}</div>
-<div class="data-item">Duration: ${duration} days</div>
-</div>
-`;
-}
-
-// ===== NARRATIVE =====
-function generate30DayNarrative(start,end){
-
-let trades=rows.filter(r=>r.Type==="Closed position" &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end);
-
-let profits=trades.map(r=>Number(r["Net profit"])||0);
-let totalTrades=trades.length;
-let totalProfit=profits.reduce((a,b)=>a+b,0);
-
-let startBal=getBalanceAt(start);
-let endBal=getBalanceAt(end);
-let growth30=startBal?(totalProfit/startBal)*100:0;
-
-let running=0,peak=0,drawdown=false;
+function analyzeBehavior(profits){
+let running=0, peak=0, drawdown=false;
 
 profits.forEach(p=>{
 running+=p;
@@ -236,34 +176,67 @@ if(running<peak) drawdown=true;
 
 let recovered = running >= peak;
 
-let behaviorText="";
-if(drawdown){
-  if(recovered){
-    behaviorText="The account experienced periods of drawdown, followed by recovery toward the end of the period.";
-  } else {
-    behaviorText="The account experienced drawdown conditions, with recovery still in progress.";
-  }
-} else {
-  behaviorText="Performance remained stable with no significant drawdown.";
+return {drawdown, recovered};
 }
 
-let text=`Over the 30-day period, ${totalTrades} trades were executed.
+function generateNarrative(start,end,type){
+
+let trades=rows.filter(r=>r.Type==="Closed position" &&
+new Date(r["Close date"])>=start &&
+new Date(r["Close date"])<=end);
+
+let profits=trades.map(r=>Number(r["Net profit"])||0);
+let totalProfit=sum(profits);
+
+let startBal=getBalanceAt(start);
+let endBal=getBalanceAt(end);
+let growth=startBal?(totalProfit/startBal)*100:0;
+
+let {drawdown,recovered}=analyzeBehavior(profits);
+
+let performanceText="";
+if(totalProfit>0){
+  performanceText="The account closed the period in profit.";
+}else if(totalProfit<0){
+  performanceText="The account closed the period at a net loss, reflecting unfavorable market conditions.";
+}else{
+  performanceText="The account remained near break-even for the period.";
+}
+
+let behaviorText="";
+if(drawdown){
+  behaviorText=recovered
+  ?"Drawdown was observed but recovery followed."
+  :"Drawdown is present with recovery still ongoing.";
+}else{
+  behaviorText="Performance remained relatively stable.";
+}
+
+let timeframeNote = type==="30"
+? "This represents short-term system behavior."
+: type==="60"
+? "This highlights how performance develops over time."
+: "This reflects a full system cycle across varying market conditions.";
+
+return `<div style="margin-top:20px">
+<div class="section-title">${type} Day Performance Commentary</div>
+<div class="data-item">
+
+${performanceText}
 
 ${behaviorText}
 
-Closed result: $${fmt(totalProfit)}. Ending balance: $${fmt(endBal)}. Growth: ${growth30.toFixed(2)}%.
+Closed result: $${fmt(totalProfit)}  
+Ending balance: $${fmt(endBal)}  
+Growth: ${growth.toFixed(2)}%
 
-Performance remains dependent on market conditions.`;
+${timeframeNote}
 
-ghlNarrative=text;
+Performance remains dependent on market conditions.
 
-return `<div style="margin-top:20px">
-<div class="section-title">30 Day Performance Commentary</div>
-<div class="data-item">${text}</div>
-</div>`;
+</div></div>`;
 }
 
-// ===== MAIN ENGINE =====
 function processResult(start,end,title,type){
 
 let endBal=getBalanceAt(end);
@@ -275,11 +248,7 @@ new Date(r["Close date"])<=end));
 let startBal=getBalanceAt(start);
 let growthTF=startBal?(closedTF/startBal)*100:0;
 
-let duration;
-if(type==="30") duration=30;
-else if(type==="60") duration=60;
-else if(type==="90") duration=90;
-else duration=calculateDuration(start,end);
+let duration = type==="30"?30:type==="60"?60:type==="90"?90:calculateDuration(start,end);
 
 let html=`<div class="section-title">${title}</div>
 <div class="data-grid">
@@ -289,8 +258,8 @@ let html=`<div class="section-title">${title}</div>
 <div class="data-item">Track Record: ${duration} days</div>
 </div>`;
 
-if(type==="30"){
-html+=generate30DayNarrative(start,end);
+if(type==="30"||type==="60"||type==="90"){
+html+=generateNarrative(start,end,type);
 }
 
 document.getElementById("breakdown").innerHTML=html;
@@ -301,10 +270,6 @@ Balance: $${fmt(endBal)}
 Closed Profit: $${fmt(closedTF)}
 Growth: ${growthTF.toFixed(2)}%
 Track Record: ${duration} days`;
-
-if(type==="30"){
-ghlText+=`\n\n${ghlNarrative}`;
-}
 
 lastStats={title,endBal,closedTF,growthTF,duration};
 }
@@ -349,9 +314,7 @@ Here is a performance update for the ${lastStats.title} period.
 
 The account stands at $${fmt(lastStats.endBal)} with a closed result of $${fmt(lastStats.closedTF)}, reflecting ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
 
-Performance remains dependent on market conditions. Periods of drawdown and recovery are expected as the system adapts to market behavior.
-
-Please let me know if you need further details.
+Performance remains dependent on market conditions. Periods of drawdown and recovery are expected.
 
 Best regards`;
 
