@@ -11,6 +11,7 @@ body {
   padding: 50px;
   color: #111;
 }
+
 .container { max-width:1100px;margin:auto; }
 
 .glass {
@@ -50,6 +51,12 @@ button:hover { background:#333; }
   padding:15px;
   border-radius:10px;
   border:1px solid #eee;
+  transition:0.2s;
+}
+
+.data-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
 .section-title {
@@ -58,6 +65,10 @@ button:hover { background:#333; }
   margin-bottom:10px;
   text-transform:uppercase;
 }
+
+h2 { font-size:28px;margin:0; }
+h3 { font-size:22px;margin:0; }
+
 </style>
 </head>
 
@@ -76,7 +87,6 @@ button:hover { background:#333; }
 <input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
-<!-- Weekly cleaner UI -->
 <div id="weeklyBox" class="hidden">
   <input type="date" id="weekStart">
   <input type="date" id="weekEnd">
@@ -103,7 +113,6 @@ button:hover { background:#333; }
 let rows=[];
 let ghlText="";
 
-// AUTO LOAD
 document.getElementById("fileInput").addEventListener("change",loadAndInit);
 document.getElementById("onboarding").addEventListener("change",loadAndInit);
 
@@ -133,48 +142,91 @@ function parseCSV(text){
 
 function sum(arr){ return arr.reduce((s,v)=>s+v,0); }
 
-function get(type,cond){
+function get(cond){
   return rows.filter(cond).map(r=>Number(r["Net profit"])||0);
 }
 
 function getFirstClose(onboard){
-  return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard)
+  return rows
+    .filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard)
     .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
-// ===== ACCOUNT DETAILS AUTO =====
 function renderAccount(){
 
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let dep=sum(get("Deposit",r=>r.Type==="Deposit"));
-let wd=sum(get("Withdrawal",r=>r.Type==="Withdrawal"));
-let closed=sum(get("Closed",r=>r.Type==="Closed position"));
-let floating=sum(get("Open",r=>r.Type==="Open position"));
+let dep=sum(get(r=>r.Type==="Deposit"));
+let wd=sum(get(r=>r.Type==="Withdrawal"));
+let closed=sum(get(r=>r.Type==="Closed position"));
+let floating=sum(get(r=>r.Type==="Open position"));
 
 let bal=dep-wd+closed;
 let growth=dep?(closed/dep)*100:0;
 
+let startDate=new Date(first["Close date"]);
+let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let duration=Math.floor((endDate-startDate)/(1000*60*60*24));
+
 document.getElementById("overview").innerHTML=`
-<div class="section-title">Account Details</div>
+
+<div class="section-title">Overview</div>
+
 <div class="data-grid">
-<div class="data-item">Balance: ${bal.toFixed(2)}</div>
-<div class="data-item">Closed: ${closed.toFixed(2)}</div>
-<div class="data-item">Floating: ${floating.toFixed(2)}</div>
-<div class="data-item">Growth: ${growth.toFixed(2)}%</div>
-<div class="data-item">1st Trade: ${new Date(first["Close date"]).toLocaleDateString()}</div>
+
+  <div class="data-item">
+    <div class="section-title">Balance</div>
+    <h2>${bal.toFixed(2)}</h2>
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Growth</div>
+    <h2>${growth.toFixed(2)}%</h2>
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Closed Profit</div>
+    <strong>${closed.toFixed(2)}</strong>
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Floating</div>
+    <strong>${floating.toFixed(2)}</strong>
+  </div>
+
+</div>
+
+<div style="margin-top:20px"></div>
+
+<div class="section-title">Track Record</div>
+
+<div class="data-grid">
+
+  <div class="data-item">
+    <div class="section-title">Start Date</div>
+    ${startDate.toLocaleDateString()}
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Last Activity</div>
+    ${endDate.toLocaleDateString()}
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Duration</div>
+    ${duration} days
+  </div>
+
 </div>
 `;
 }
 
-// ===== WEEKLY UI =====
 function showWeekly(){
   document.getElementById("weeklyBox").classList.remove("hidden");
 }
 
-// ===== PERFORMANCE =====
 function run(type){
 
 const onboard=new Date(document.getElementById("onboarding").value);
@@ -186,13 +238,10 @@ let start,end,title;
 if(type==="weekly"){
   start=new Date(document.getElementById("weekStart").value);
   end=new Date(document.getElementById("weekEnd").value);
-
   if(!start || !end) return alert("Select dates");
-
-  title=`Weekly`;
+  title="Weekly";
 }else{
   document.getElementById("weeklyBox").classList.add("hidden");
-
   let days=Number(type);
   start=new Date(first["Close date"]);
   end=new Date(start);
@@ -200,32 +249,48 @@ if(type==="weekly"){
   title=`${days} Days`;
 }
 
-// SNAPSHOT
-let dep=sum(get("d",r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
-let wd=sum(get("w",r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
-let closedTotal=sum(get("c",r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
+let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
+let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
+let closedTotal=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
 
 let bal=dep-wd+closedTotal;
 
-// PERIOD PROFIT
-let closedTF=sum(get("c2",r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let closedTF=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+
+let growthTF=dep?(closedTF/dep)*100:0;
 
 document.getElementById("breakdown").innerHTML=`
+
 <div class="section-title">Performance (${title})</div>
+
 <div class="data-grid">
-<div class="data-item">Balance: ${bal.toFixed(2)}</div>
-<div class="data-item">Closed Profit: ${closedTF.toFixed(2)}</div>
+
+  <div class="data-item">
+    <div class="section-title">Balance</div>
+    <h3>${bal.toFixed(2)}</h3>
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Closed Profit</div>
+    <h3>${closedTF.toFixed(2)}</h3>
+  </div>
+
+  <div class="data-item">
+    <div class="section-title">Growth (Period)</div>
+    <h3>${growthTF.toFixed(2)}%</h3>
+  </div>
+
 </div>
 `;
 
 ghlText=`Software: ${document.getElementById("software").value}
 
 Balance: ${bal.toFixed(2)}
-Closed: ${closedTF.toFixed(2)}
+Closed Profit: ${closedTF.toFixed(2)}
+Growth: ${growthTF.toFixed(2)}%
 `;
 }
 
-// COPY
 function copyNote(){
   if(!ghlText) return alert("Run first");
   navigator.clipboard.writeText(ghlText);
