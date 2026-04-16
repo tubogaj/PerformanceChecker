@@ -147,16 +147,45 @@ let growth=startBal?(total/startBal)*100:0;
 return {trades,total,startBal,endBal,growth};
 }
 
-// ===== SYSTEM CONTEXT =====
-function systemContext(system){
-if(system==="R2") return "This system operates using a grid-based structure where positions are layered as price moves, making drawdown a natural part of its execution before recovery occurs.";
-if(system==="R2.5") return "This system follows a grid-based structure with increased lot sizing, resulting in amplified exposure where both growth and drawdown cycles occur more rapidly.";
-if(["R10","R50","R400"].includes(system)) return "This system operates as a multi-strategy AI allocator, distributing exposure across multiple currency pairs and strategies based on changing market conditions.";
-if(system==="RX25") return "This system dynamically rotates across multiple subsystems, including selective gold exposure, adapting to shifts in volatility and market structure.";
-if(system==="RX5") return "This system follows a similar adaptive multi-strategy approach with moderated exposure, prioritizing capital stability and controlled growth.";
-if(system==="RC30") return "This system operates within the cryptocurrency market, adapting to high-volatility conditions across BTC and ETH cycles.";
-if(system==="RS15") return "This system is an intraday, event-driven strategy that selectively trades during high-impact news releases, resulting in irregular but precise execution.";
-if(system==="RA10") return "This system focuses on reversal-based execution, identifying high-probability turning points rather than continuously trading market trends.";
+// ===== SYSTEM BEHAVIOR (NOW USED INLINE) =====
+function systemNarrative(system, profit){
+
+if(system==="R2"){
+return profit>=0
+? "This aligns with how grid-based systems recover through layered positioning as price retraces."
+: "This is consistent with grid-based execution where positions are built during adverse movement before recovery occurs.";
+}
+
+if(system==="R2.5"){
+return profit>=0
+? "The stronger result reflects the system’s increased exposure, allowing faster recovery cycles."
+: "The drawdown reflects the amplified exposure of the system, where movements are more aggressive before recovery phases.";
+}
+
+if(["R10","R50","R400"].includes(system)){
+return "This reflects the behavior of a diversified AI allocation system, where performance is driven by multiple strategies adapting to market conditions.";
+}
+
+if(system==="RX25"){
+return "This aligns with the system’s adaptive allocation across forex and gold, adjusting exposure based on volatility conditions.";
+}
+
+if(system==="RX5"){
+return "This reflects the system’s more conservative allocation approach, prioritizing stability over aggressive expansion.";
+}
+
+if(system==="RC30"){
+return "This behavior is consistent with crypto market exposure, where higher volatility leads to stronger swings in both directions.";
+}
+
+if(system==="RS15"){
+return "This reflects the system’s event-driven nature, where activity depends on high-impact market conditions rather than continuous trading.";
+}
+
+if(system==="RA10"){
+return "This aligns with the system’s reversal-based logic, where trades are only executed under confirmed turning conditions.";
+}
+
 return "";
 }
 
@@ -174,13 +203,13 @@ if(type==="30"){
 return `<div class="data-item">
 ${tone}
 
-During the first 30 days, the system executed ${d.trades.length} trades, producing a closed result of $${fmt(d.total)} and reaching a balance of $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}% growth.
+During the first 30 days, the system executed ${d.trades.length} trades, generating $${fmt(d.total)} and reaching $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}%.
 
-${systemContext(system)}
+${systemNarrative(system, d.total)}
 
-This initial phase reflects how the system behaves under live market conditions, where exposure is being established and fluctuations, including drawdown and recovery, are expected as part of normal operation.
+This phase reflects initial live execution where fluctuations are expected as the system establishes positions.
 
-Performance remains dependent on prevailing market conditions, and short-term variability should be expected during this stage.
+Performance remains dependent on market conditions, and short-term variability is part of normal behavior.
 </div>`;
 }
 
@@ -193,15 +222,15 @@ let next30=analyzePeriod(mid,end);
 return `<div class="data-item">
 ${tone}
 
-Over the first 30 days, the account generated $${fmt(first30.total)}. In the following 30-day period, the system produced $${fmt(next30.total)}, highlighting how performance evolved beyond the initial phase.
+The first 30 days produced $${fmt(first30.total)}, while the following 30 days resulted in $${fmt(next30.total)}, showing how performance evolved.
 
-The account now stands at $${fmt(d.endBal)}, with an overall result of $${fmt(d.total)}, equivalent to ${d.growth.toFixed(2)}%.
+The account now stands at $${fmt(d.endBal)}, with total growth of ${d.growth.toFixed(2)}%.
 
-${systemContext(system)}
+${systemNarrative(system, d.total)}
 
-This comparison illustrates how the system transitioned from early-stage behavior into a more developed execution phase, where patterns of recovery, stability, or continued fluctuation become clearer.
+This progression highlights how the system transitions from initial exposure into more established behavior over time.
 
-Performance continues to depend on market conditions, and both positive and negative cycles remain part of normal system behavior.
+Performance remains dependent on market conditions, and fluctuations continue to be part of the system’s normal cycle.
 </div>`;
 }
 
@@ -209,15 +238,13 @@ if(type==="90"){
 return `<div class="data-item">
 ${tone}
 
-Over the 90-day period, the system executed ${d.trades.length} trades, generating a total result of $${fmt(d.total)} and reaching a balance of $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}% growth.
+Over 90 days, the system executed ${d.trades.length} trades, producing $${fmt(d.total)} and reaching $${fmt(d.endBal)}, equivalent to ${d.growth.toFixed(2)}%.
 
-${systemContext(system)}
+${systemNarrative(system, d.total)}
 
-This extended duration provides a more complete view of the system’s behavior across multiple market conditions, including periods of favorable movement, consolidation, and drawdown.
+This period reflects a more complete cycle of performance, where early-stage variability transitions into more consistent execution patterns.
 
-The performance observed reflects how the system operates over time, where initial fluctuations transition into more structured execution patterns and potential recovery phases.
-
-While the results provide a clearer indication of system behavior, performance remains dependent on ongoing market conditions, and variability should still be expected moving forward.
+Performance remains dependent on market conditions, and ongoing variability should be expected.
 </div>`;
 }
 
