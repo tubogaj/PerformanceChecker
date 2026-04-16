@@ -11,6 +11,7 @@ body {
   padding: 50px;
   color: #111;
 }
+
 .container { max-width:1100px;margin:auto; }
 
 .glass {
@@ -22,12 +23,22 @@ body {
   border:1px solid rgba(0,0,0,0.05);
 }
 
-input { padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px; }
+input {
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  margin:5px;
+}
 
 button {
-  padding:10px 16px;border:none;border-radius:8px;
-  background:#111;color:#fff;cursor:pointer;
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#111;
+  color:#fff;
+  cursor:pointer;
 }
+button:hover { background:#333; }
 
 .data-grid {
   display:grid;
@@ -36,14 +47,24 @@ button {
 }
 
 .data-item {
-  background:#fff;padding:15px;border-radius:10px;border:1px solid #eee;
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #eee;
 }
 
 .section-title {
-  font-size:13px;color:#666;margin-bottom:10px;text-transform:uppercase;
+  font-size:13px;
+  color:#666;
+  margin-bottom:10px;
+  text-transform:uppercase;
 }
 
-.note { font-size:12px;color:#777;margin-top:10px; }
+.note {
+  font-size:12px;
+  color:#777;
+  margin-top:10px;
+}
 
 h2 { font-size:28px;margin:0; }
 </style>
@@ -138,31 +159,46 @@ return dep-wd+cl;
 
 // ===== OVERVIEW =====
 function renderAccount(){
+
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let start=new Date(first["Close date"]);
-let end=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let firstClose=new Date(first["Close date"]);
+let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-let startBal=getBalanceAt(start);
-let endBal=getBalanceAt(end);
+let duration=Math.floor((lastActivity-firstClose)/(1000*60*60*24))+1;
+
+let startBal=getBalanceAt(firstClose);
+let endBal=getBalanceAt(lastActivity);
+
 let closed=sum(get(r=>r.Type==="Closed position"));
-
 let growth=startBal?(closed/startBal)*100:0;
 
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
+
 <div class="data-grid">
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
 </div>
-<div class="note">Running performance as of last activity date</div>
+
+<div style="margin-top:20px"></div>
+
+<div class="section-title">Account Details</div>
+
+<div class="data-grid">
+<div class="data-item">First Close Trade<br>${firstClose.toLocaleDateString()}</div>
+<div class="data-item">Last Activity Date<br>${lastActivity.toLocaleDateString()}</div>
+<div class="data-item">Track Record<br>${duration} days</div>
+</div>
+
+<div class="note">This reflects the running performance of the account as of the last activity date.</div>
 `;
 }
 
-// ===== ADVANCED NARRATIVE =====
+// ===== NARRATIVE =====
 function generateNarrative(start,end,type){
 
 let trades=rows.filter(r=>r.Type==="Closed position" &&
@@ -176,8 +212,8 @@ let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
 let growth=startBal?(total/startBal)*100:0;
 
-// drawdown logic
-let running=0, peak=0, drawdown=false;
+let running=0,peak=0,drawdown=false;
+
 profits.forEach(p=>{
 running+=p;
 if(running>peak) peak=running;
@@ -186,8 +222,7 @@ if(running<peak) drawdown=true;
 
 let recovered=running>=peak;
 
-let behavior=
-drawdown
+let behavior=drawdown
 ? (recovered
   ? "The account experienced drawdown followed by recovery toward the end of the period."
   : "The account experienced drawdown with recovery still in progress.")
@@ -204,7 +239,7 @@ ${behavior}
 
 The account generated a closed result of $${fmt(total)}, reaching a balance of $${fmt(endBal)}, reflecting a growth of ${growth.toFixed(2)}%.
 
-Overall, the system's performance reflects its response to prevailing market conditions, where both drawdown and recovery phases are part of normal operational behavior.
+Performance remains dependent on prevailing market conditions, where both drawdown and recovery phases are part of the system’s normal behavior.
 
 </div></div>`;
 }
@@ -213,6 +248,7 @@ Overall, the system's performance reflects its response to prevailing market con
 function processResult(start,end,title,type){
 
 let endBal=getBalanceAt(end);
+
 let closedTF=sum(get(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
 new Date(r["Close date"])<=end));
@@ -228,6 +264,7 @@ Math.floor((end-start)/(1000*60*60*24))+1;
 
 let html=`
 <div class="section-title">${title}</div>
+
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
@@ -242,7 +279,11 @@ html+=generateNarrative(start,end,type);
 
 document.getElementById("breakdown").innerHTML=html;
 
-ghlText=title+"\nBalance: $"+fmt(endBal)+"\nClosed Profit: $"+fmt(closedTF)+"\nGrowth: "+growthTF.toFixed(2)+"%\nTrack Record: "+duration+" days";
+ghlText=`${title}
+Balance: $${fmt(endBal)}
+Closed Profit: $${fmt(closedTF)}
+Growth: ${growthTF.toFixed(2)}%
+Track Record: ${duration} days`;
 
 lastStats={title,endBal,closedTF,growthTF,duration};
 }
@@ -292,7 +333,7 @@ Here is the performance update for ${lastStats.title}.
 
 The account stands at $${fmt(lastStats.endBal)} with a closed result of $${fmt(lastStats.closedTF)}, reflecting ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
 
-Performance continues to be influenced by market conditions, with periods of drawdown and recovery forming part of the system’s normal behavior.
+Performance remains dependent on market conditions, where drawdown and recovery cycles are part of normal system behavior.
 
 Please let me know if you would like further details.
 
