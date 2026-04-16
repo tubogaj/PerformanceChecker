@@ -242,6 +242,17 @@ let profits = trades.map(r=>Number(r["Net profit"])||0);
 let totalTrades = trades.length;
 let totalProfit = profits.reduce((a,b)=>a+b,0);
 
+// BALANCE ON DAY 30
+let dep = sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
+let wd = sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
+let closedTotal = sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
+
+let balanceDay30 = dep - wd + closedTotal;
+
+// GROWTH %
+let growth30 = dep ? (totalProfit/dep)*100 : 0;
+
+// DRAWdown + RECOVERY LOGIC
 let running = 0;
 let peak = 0;
 let drawdownOccurred = false;
@@ -254,22 +265,51 @@ profits.forEach(p=>{
 
 let recovered = running >= peak;
 
-let narrative = `
+// ===== CORPORATE TEXT VARIATIONS =====
+
+let narrativeCore = "";
+
+if(totalProfit >= 0){
+
+  narrativeCore = `
+  Over the initial 30-day period following onboarding, the account generated a total closed profit of $${totalProfit.toFixed(2)}, with ${totalTrades} trades executed. 
+  The account reached a balance of $${balanceDay30.toFixed(2)} by the end of the 30-day period, reflecting a growth of ${growth30.toFixed(2)}%.
+
+  ${drawdownOccurred 
+    ? (recovered 
+        ? "During this period, the account experienced interim drawdowns but demonstrated the ability to recover and stabilize, closing the period on a positive footing."
+        : "While periods of drawdown were observed, recovery remained in progress toward the end of the evaluation window."
+      )
+    : "Performance remained relatively stable throughout the period without material drawdown."
+  }
+
+  Overall, performance indicates that the strategy has been able to navigate market conditions effectively within the observed timeframe.
+  `;
+
+} else {
+
+  narrativeCore = `
+  Over the initial 30-day period following onboarding, the account recorded a total closed result of $${totalProfit.toFixed(2)}, across ${totalTrades} executed trades. 
+  The account balance stood at $${balanceDay30.toFixed(2)} at the end of the 30-day period, corresponding to a performance of ${growth30.toFixed(2)}%.
+
+  ${drawdownOccurred 
+    ? "The account experienced sustained drawdown conditions throughout the period, reflecting unfavorable market behavior relative to the strategy."
+    : "Performance remained constrained without significant recovery during the evaluation window."
+  }
+
+  At this stage, the account has not yet transitioned into a sustained recovery phase, and performance continues to be influenced by prevailing market conditions.
+  `;
+
+}
+
+return `
 <div style="margin-top:20px">
   <div class="section-title">30 Day Performance Commentary</div>
   <div class="data-item" style="line-height:1.6">
-
-  Over the initial 30-day period following onboarding, the account ${drawdownOccurred ? "experienced periods of drawdown" : "maintained relatively stable performance without material drawdown"}. 
-  ${drawdownOccurred ? (recovered ? "The system demonstrated the ability to recover from these drawdowns and stabilize performance levels." : "While recovery efforts were observed, the account has not fully retraced prior drawdown levels within this period.") : ""}
-  
-  A total of ${totalTrades} trades were executed during this timeframe, resulting in a net performance that is ${totalProfit >= 0 ? "positive" : "negative"} overall. 
-  ${totalProfit >= 0 ? "Performance indicates that the strategy has been able to navigate market conditions effectively within the observed period." : "Performance remains under pressure, reflecting challenging market conditions during the evaluation window."}
-
+    ${narrativeCore}
   </div>
 </div>
 `;
-
-return narrative;
 }
 
 // ===== ACTIONS =====
