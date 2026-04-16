@@ -11,7 +11,6 @@ body {
   padding: 50px;
   color: #111;
 }
-
 .container { max-width:1100px;margin:auto; }
 
 .glass {
@@ -51,12 +50,6 @@ button:hover { background:#333; }
   padding:15px;
   border-radius:10px;
   border:1px solid #eee;
-  transition:0.2s;
-}
-
-.data-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
 .section-title {
@@ -78,7 +71,6 @@ h3 { font-size:22px;margin:0; }
 
 <div class="glass header">
   <h2>Account Performance Checker</h2>
-  <img src="logo.png" class="logo">
 </div>
 
 <div class="glass">
@@ -87,24 +79,15 @@ h3 { font-size:22px;margin:0; }
 <input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
-<div id="weeklyBox" class="hidden">
-  <input type="date" id="weekStart">
-  <input type="date" id="weekEnd">
-  <button onclick="run('weekly')">Run Weekly</button>
-</div>
-
 <br>
 
-<button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
-<button onclick="runDetailed()">Detailed Review</button>
 <button onclick="copyNote()">Copy GHL</button>
 
 </div>
 
-<div id="overview" class="glass"></div>
 <div id="breakdown" class="glass"></div>
 
 </div>
@@ -125,7 +108,6 @@ function loadAndInit(){
   const reader=new FileReader();
   reader.onload=e=>{
     rows=parseCSV(e.target.result);
-    renderAccount();
   };
   reader.readAsText(file);
 }
@@ -154,168 +136,15 @@ function getFirstClose(onboard){
 }
 
 function calculateDuration(start, end){
-  return Math.floor((end - start)/(1000*60*60*24));
+  return Math.floor((end - start)/(1000*60*60*24)) + 1;
 }
 
-function renderAccount(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let startDate=new Date(first["Close date"]);
-let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-let duration=calculateDuration(startDate, endDate);
-
-let dep=sum(get(r=>r.Type==="Deposit"));
-let wd=sum(get(r=>r.Type==="Withdrawal"));
-let closed=sum(get(r=>r.Type==="Closed position"));
-let floating=sum(get(r=>r.Type==="Open position"));
-
-let bal=dep-wd+closed;
-let growth=dep?(closed/dep)*100:0;
-
-document.getElementById("overview").innerHTML=`
-
-<div class="section-title">Overview</div>
-
-<div class="data-grid">
-
-  <div class="data-item">
-    <div class="section-title">Balance</div>
-    <h2>${bal.toFixed(2)}</h2>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Growth</div>
-    <h2>${growth.toFixed(2)}%</h2>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Closed Profit</div>
-    <strong>${closed.toFixed(2)}</strong>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Floating</div>
-    <strong>${floating.toFixed(2)}</strong>
-  </div>
-
-</div>
-
-<div style="margin-top:20px"></div>
-
-<div class="section-title">Track Record</div>
-
-<div class="data-grid">
-
-  <div class="data-item">
-    <div class="section-title">Start Date</div>
-    ${startDate.toLocaleDateString()}
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Last Activity</div>
-    ${endDate.toLocaleDateString()}
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Duration</div>
-    ${duration} days
-  </div>
-
-</div>
-`;
-}
-
-// ===== CORPORATE 30 DAY NARRATIVE =====
-function generate30DayNarrative(start, end){
-
-let trades = rows.filter(r =>
-  r.Type==="Closed position" &&
-  new Date(r["Close date"])>=start &&
-  new Date(r["Close date"])<=end
-);
-
-let profits = trades.map(r=>Number(r["Net profit"])||0);
-
-let totalTrades = trades.length;
-let totalProfit = profits.reduce((a,b)=>a+b,0);
-
-// BALANCE ON DAY 30
-let dep = sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
-let wd = sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
-let closedTotal = sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
-
-let balanceDay30 = dep - wd + closedTotal;
-
-// GROWTH %
-let growth30 = dep ? (totalProfit/dep)*100 : 0;
-
-// DRAWdown + RECOVERY LOGIC
-let running = 0;
-let peak = 0;
-let drawdownOccurred = false;
-
-profits.forEach(p=>{
-  running += p;
-  if(running > peak) peak = running;
-  if(running < peak) drawdownOccurred = true;
-});
-
-let recovered = running >= peak;
-
-// ===== CORPORATE TEXT VARIATIONS =====
-
-let narrativeCore = "";
-
-if(totalProfit >= 0){
-
-  narrativeCore = `
-  Over the initial 30-day period following onboarding, the account generated a total closed profit of $${totalProfit.toFixed(2)}, with ${totalTrades} trades executed. 
-  The account reached a balance of $${balanceDay30.toFixed(2)} by the end of the 30-day period, reflecting a growth of ${growth30.toFixed(2)}%.
-
-  ${drawdownOccurred 
-    ? (recovered 
-        ? "During this period, the account experienced interim drawdowns but demonstrated the ability to recover and stabilize, closing the period on a positive footing."
-        : "While periods of drawdown were observed, recovery remained in progress toward the end of the evaluation window."
-      )
-    : "Performance remained relatively stable throughout the period without material drawdown."
-  }
-
-  Overall, performance indicates that the strategy has been able to navigate market conditions effectively within the observed timeframe.
-  `;
-
-} else {
-
-  narrativeCore = `
-  Over the initial 30-day period following onboarding, the account recorded a total closed result of $${totalProfit.toFixed(2)}, across ${totalTrades} executed trades. 
-  The account balance stood at $${balanceDay30.toFixed(2)} at the end of the 30-day period, corresponding to a performance of ${growth30.toFixed(2)}%.
-
-  ${drawdownOccurred 
-    ? "The account experienced sustained drawdown conditions throughout the period, reflecting unfavorable market behavior relative to the strategy."
-    : "Performance remained constrained without significant recovery during the evaluation window."
-  }
-
-  At this stage, the account has not yet transitioned into a sustained recovery phase, and performance continues to be influenced by prevailing market conditions.
-  `;
-
-}
-
-return `
-<div style="margin-top:20px">
-  <div class="section-title">30 Day Performance Commentary</div>
-  <div class="data-item" style="line-height:1.6">
-    ${narrativeCore}
-  </div>
-</div>
-`;
-}
-
-// ===== ACTIONS =====
-
-function showWeekly(){
-  document.getElementById("weeklyBox").classList.remove("hidden");
+// ✅ NEW
+function getBalanceAt(date){
+  let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=date));
+  let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=date));
+  let closed=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=date));
+  return dep-wd+closed;
 }
 
 function run(type){
@@ -325,96 +154,41 @@ const first=getFirstClose(onboard);
 if(!first) return;
 
 let start=new Date(first["Close date"]);
-let end,title;
+let end=new Date(start);
+end.setDate(end.getDate()+(Number(type)-1));
 
-if(type==="weekly"){
-  end=new Date(document.getElementById("weekEnd").value);
-  if(!end) return alert("Select dates");
-  title="Weekly";
-}else{
-  let days=Number(type);
-  end=new Date(start);
-  end.setDate(end.getDate()+(days-1));
-  title=`${days} Days`;
-}
+// ✅ START BALANCE
+let startBal=getBalanceAt(start);
 
-processResult(start, end, title);
+// CLOSED PROFIT
+let closedTF=sum(get(r=>r.Type==="Closed position" &&
+  new Date(r["Close date"])>=start &&
+  new Date(r["Close date"])<=end));
 
-// ✅ ADD NARRATIVE FOR 30 DAYS
-if(type==="30"){
-  const narrative = generate30DayNarrative(start, end);
-  document.getElementById("breakdown").innerHTML += narrative;
-}
+// END BALANCE
+let endBal=getBalanceAt(end);
 
-}
+// ✅ CORRECT GROWTH
+let growth=(startBal ? (closedTF/startBal)*100 : 0);
 
-function runDetailed(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let start=new Date(first["Close date"]);
-let end=new Date();
-end.setDate(end.getDate()-1);
-
-processResult(start, end, "Detailed Review");
-}
-
-// ===== CENTRAL CALC =====
-
-function processResult(start, end, title){
-
-let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=end));
-let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=end));
-let closedTotal=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=end));
-
-let bal=dep-wd+closedTotal;
-
-let closedTF=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-
-let growthTF=dep?(closedTF/dep)*100:0;
-
-let durationDays=calculateDuration(start,end);
+let duration=calculateDuration(start,end);
 
 document.getElementById("breakdown").innerHTML=`
-
-<div class="section-title">${title}</div>
-
+<div class="section-title">${type} Days</div>
 <div class="data-grid">
-
-  <div class="data-item">
-    <div class="section-title">Balance</div>
-    <h3>${bal.toFixed(2)}</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Closed Profit</div>
-    <h3>${closedTF.toFixed(2)}</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Growth</div>
-    <h3>${growthTF.toFixed(2)}%</h3>
-  </div>
-
-  <div class="data-item">
-    <div class="section-title">Track Record</div>
-    <h3>${durationDays} days</h3>
-  </div>
-
+<div class="data-item">Balance: <h3>${endBal.toFixed(2)}</h3></div>
+<div class="data-item">Closed Profit: <h3>${closedTF.toFixed(2)}</h3></div>
+<div class="data-item">Growth: <h3>${growth.toFixed(2)}%</h3></div>
+<div class="data-item">Track Record: <h3>${duration} days</h3></div>
 </div>
 `;
 
-ghlText=`Software: ${document.getElementById("software").value}
+ghlText=`${type} Days
 
-${title}
-
-Balance: ${bal.toFixed(2)}
+Balance: ${endBal.toFixed(2)}
 Closed Profit: ${closedTF.toFixed(2)}
-Growth: ${growthTF.toFixed(2)}%
-Track Record: ${durationDays} days
-`;
+Growth: ${growth.toFixed(2)}%
+Track Record: ${duration} days`;
 }
 
 function copyNote(){
