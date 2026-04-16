@@ -15,7 +15,7 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   margin-bottom: 20px;
   border:1px solid rgba(0,0,0,0.05);
 }
-input { padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px; }
+input, select { padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px; }
 button { padding:10px 16px;border:none;border-radius:8px;background:#111;color:#fff;cursor:pointer; }
 button:hover { background:#333; }
 
@@ -34,8 +34,23 @@ h2 { font-size:28px;margin:0; }
 <div class="glass"><h2>Account Performance Checker</h2></div>
 
 <div class="glass">
+
 <input type="file" id="fileInput"><br>
-<input type="text" id="software" placeholder="Software">
+
+<select id="software">
+<option value="">Select System</option>
+<option>R2</option>
+<option>R2.5</option>
+<option>R10</option>
+<option>R50</option>
+<option>R400</option>
+<option>RX25</option>
+<option>RC30</option>
+<option>RX5</option>
+<option>RS15</option>
+<option>RA10</option>
+</select>
+
 <input type="date" id="onboarding">
 
 <div id="weeklyBox" style="display:none">
@@ -68,6 +83,12 @@ let ghlText="";
 let lastStats={};
 
 const fmt = v => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function calcDaysInclusive(start,end){
+  const s=new Date(start); s.setHours(0,0,0,0);
+  const e=new Date(end); e.setHours(0,0,0,0);
+  return Math.floor((e-s)/(1000*60*60*24))+1;
+}
 
 document.getElementById("fileInput").addEventListener("change",init);
 document.getElementById("onboarding").addEventListener("change",init);
@@ -126,13 +147,26 @@ let growth=startBal?(total/startBal)*100:0;
 return {trades,total,startBal,endBal,growth};
 }
 
+// ===== SYSTEM CONTEXT =====
+function systemContext(system){
+if(system==="R2") return "This system operates using a grid-based structure where positions are layered as price moves, making drawdown a natural part of its execution before recovery occurs.";
+if(system==="R2.5") return "This system follows a grid-based structure with increased lot sizing, resulting in amplified exposure where both growth and drawdown cycles occur more rapidly.";
+if(["R10","R50","R400"].includes(system)) return "This system operates as a multi-strategy AI allocator, distributing exposure across multiple currency pairs and strategies based on changing market conditions.";
+if(system==="RX25") return "This system dynamically rotates across multiple subsystems, including selective gold exposure, adapting to shifts in volatility and market structure.";
+if(system==="RX5") return "This system follows a similar adaptive multi-strategy approach with moderated exposure, prioritizing capital stability and controlled growth.";
+if(system==="RC30") return "This system operates within the cryptocurrency market, adapting to high-volatility conditions across BTC and ETH cycles.";
+if(system==="RS15") return "This system is an intraday, event-driven strategy that selectively trades during high-impact news releases, resulting in irregular but precise execution.";
+if(system==="RA10") return "This system focuses on reversal-based execution, identifying high-probability turning points rather than continuously trading market trends.";
+return "";
+}
+
 // ===== NARRATIVE =====
 function generateNarrative(start,end,type){
 
 let d = analyzePeriod(start,end);
-let isProfit = d.total >= 0;
+let system=document.getElementById("software").value;
 
-let tone = isProfit
+let tone = d.total>=0
 ? "The system delivered a positive performance during this period."
 : "The system closed this period at a net loss.";
 
@@ -140,37 +174,34 @@ if(type==="30"){
 return `<div class="data-item">
 ${tone}
 
-During the first 30 days, the system executed ${d.trades.length} trades.
+During the first 30 days, the system executed ${d.trades.length} trades, producing a closed result of $${fmt(d.total)} and reaching a balance of $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}% growth.
 
-The account generated a closed result of $${fmt(d.total)}, reaching a balance of $${fmt(d.endBal)}, reflecting a growth of ${d.growth.toFixed(2)}%.
+${systemContext(system)}
 
-This initial phase typically includes fluctuations as positions are established, where drawdown and recovery cycles are expected.
+This initial phase reflects how the system behaves under live market conditions, where exposure is being established and fluctuations, including drawdown and recovery, are expected as part of normal operation.
 
-Performance remains dependent on prevailing market conditions, and short-term variability is part of the system’s normal behavior.
+Performance remains dependent on prevailing market conditions, and short-term variability should be expected during this stage.
 </div>`;
 }
 
 if(type==="60"){
 
 let mid=new Date(start); mid.setDate(mid.getDate()+29);
-
-let first30 = analyzePeriod(start,mid);
-let next30 = analyzePeriod(mid,end);
+let first30=analyzePeriod(start,mid);
+let next30=analyzePeriod(mid,end);
 
 return `<div class="data-item">
 ${tone}
 
-At the 60-day mark, the system begins to show more defined behavior.
+Over the first 30 days, the account generated $${fmt(first30.total)}. In the following 30-day period, the system produced $${fmt(next30.total)}, highlighting how performance evolved beyond the initial phase.
 
-During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}.
+The account now stands at $${fmt(d.endBal)}, with an overall result of $${fmt(d.total)}, equivalent to ${d.growth.toFixed(2)}%.
 
-The account now stands at $${fmt(d.endBal)}, reflecting an overall performance of ${d.growth.toFixed(2)}%.
+${systemContext(system)}
 
-This comparison highlights how the system progressed after the initial phase, showing how performance evolves as more positions are executed.
+This comparison illustrates how the system transitioned from early-stage behavior into a more developed execution phase, where patterns of recovery, stability, or continued fluctuation become clearer.
 
-While fluctuations may still occur, this stage typically reflects improved structure and clearer recovery behavior.
-
-Performance continues to depend on market conditions, and both positive and negative phases remain part of normal system operation.
+Performance continues to depend on market conditions, and both positive and negative cycles remain part of normal system behavior.
 </div>`;
 }
 
@@ -178,15 +209,15 @@ if(type==="90"){
 return `<div class="data-item">
 ${tone}
 
-Over the 90-day period, the system has executed ${d.trades.length} trades, navigating multiple market conditions.
+Over the 90-day period, the system executed ${d.trades.length} trades, generating a total result of $${fmt(d.total)} and reaching a balance of $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}% growth.
 
-The account reached $${fmt(d.endBal)}, generating a total result of $${fmt(d.total)}, equivalent to ${d.growth.toFixed(2)}% growth.
+${systemContext(system)}
 
-This longer duration provides a more complete view of system behavior, where early-stage fluctuations transition into more consistent execution patterns.
+This extended duration provides a more complete view of the system’s behavior across multiple market conditions, including periods of favorable movement, consolidation, and drawdown.
 
-The performance observed aligns with expectations established during the initial 30-day phase, including periods of drawdown followed by recovery.
+The performance observed reflects how the system operates over time, where initial fluctuations transition into more structured execution patterns and potential recovery phases.
 
-Overall, this reflects a more stable and repeatable system behavior, although performance remains dependent on market conditions and ongoing variability should be expected.
+While the results provide a clearer indication of system behavior, performance remains dependent on ongoing market conditions, and variability should still be expected moving forward.
 </div>`;
 }
 
@@ -195,8 +226,8 @@ Overall, this reflects a more stable and repeatable system behavior, although pe
 // ===== ENGINE =====
 function processResult(start,end,title,type){
 
-let d = analyzePeriod(start,end);
-let duration = Math.floor((end-start)/(1000*60*60*24))+1;
+let d=analyzePeriod(start,end);
+let duration=calcDaysInclusive(start,end);
 
 let html=`
 <div class="section-title">${title}</div>
@@ -217,16 +248,16 @@ ${generateNarrative(start,end,type)}`;
 
 document.getElementById("breakdown").innerHTML=html;
 
-let software=document.getElementById("software").value||"N/A";
+let system=document.getElementById("software").value||"N/A";
 
-ghlText=`Software: ${software}
+ghlText=`System: ${system}
 ${title}
 Balance: $${fmt(d.endBal)}
 Closed Profit: $${fmt(d.total)}
 Growth: ${d.growth.toFixed(2)}%
 Track Record: ${duration} days`;
 
-lastStats={title,...d,duration,software};
+lastStats={title,...d,duration,system};
 }
 
 // ===== BUTTONS =====
@@ -272,7 +303,7 @@ if(!lastStats.title) return alert("Run report first");
 
 let email=`Hi,
 
-Here is your ${lastStats.title} performance update for ${lastStats.software}.
+Here is your ${lastStats.title} performance update for ${lastStats.system}.
 
 The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
 
@@ -291,12 +322,12 @@ const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let software=document.getElementById("software").value||"N/A";
+let system=document.getElementById("software").value||"N/A";
 
 let firstClose=new Date(first["Close date"]);
 let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-let duration=Math.floor((lastActivity-firstClose)/(1000*60*60*24))+1;
+let duration=calcDaysInclusive(firstClose,lastActivity);
 
 let endBal=getBalanceAt(lastActivity);
 let closed=sum(get(r=>r.Type==="Closed position"));
@@ -307,10 +338,10 @@ document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
 
 <div class="data-grid">
-<div class="data-item">Software<br><h2>${software}</h2></div>
+<div class="data-item">System<br><h2>${system}</h2></div>
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
-<div class="data-item">Closed Profit<br><h2>${fmt(closed)}</h2></div>
+<div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
 <div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
 <div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
