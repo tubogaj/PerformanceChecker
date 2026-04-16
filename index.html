@@ -259,6 +259,9 @@ let closedTF=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])>
 
 let growthTF=dep?(closedTF/dep)*100:0;
 
+// ✅ DURATION FOR GHL (BASED ON PERIOD END)
+let durationDays=Math.floor((end - new Date(first["Close date"]))/(1000*60*60*24));
+
 document.getElementById("breakdown").innerHTML=`
 
 <div class="section-title">Performance (${title})</div>
@@ -288,6 +291,7 @@ ghlText=`Software: ${document.getElementById("software").value}
 Balance: ${bal.toFixed(2)}
 Closed Profit: ${closedTF.toFixed(2)}
 Growth: ${growthTF.toFixed(2)}%
+Track Record: ${durationDays} days
 `;
 }
 
