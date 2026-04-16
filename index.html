@@ -51,12 +51,6 @@ button:hover { background:#333; }
   padding:15px;
   border-radius:10px;
   border:1px solid #eee;
-  transition:0.2s;
-}
-
-.data-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
 .section-title {
@@ -64,6 +58,12 @@ button:hover { background:#333; }
   color:#666;
   margin-bottom:10px;
   text-transform:uppercase;
+}
+
+.note {
+  font-size:12px;
+  color:#777;
+  margin-top:10px;
 }
 
 h2 { font-size:28px;margin:0; }
@@ -78,7 +78,6 @@ h3 { font-size:22px;margin:0; }
 
 <div class="glass header">
   <h2>Account Performance Checker</h2>
-  <img src="logo.png" class="logo">
 </div>
 
 <div class="glass">
@@ -114,7 +113,6 @@ h3 { font-size:22px;margin:0; }
 
 let rows=[];
 let ghlText="";
-let ghlNarrative="";
 let lastStats={};
 
 const fmt = (v) => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -169,88 +167,52 @@ function calculateDuration(start,end){
   return Math.floor((end-start)/(1000*60*60*24))+1;
 }
 
-function generate30DayNarrative(start,end){
-
-let trades=rows.filter(r=>r.Type==="Closed position" &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end);
-
-let profits=trades.map(r=>Number(r["Net profit"])||0);
-let totalTrades=trades.length;
-let totalProfit=profits.reduce((a,b)=>a+b,0);
-
-let startBal=getBalanceAt(start);
-let endBal=getBalanceAt(end);
-let growth30=startBal?(totalProfit/startBal)*100:0;
-
-let running=0,peak=0,dd=false;
-profits.forEach(p=>{
-running+=p;
-if(running>peak) peak=running;
-if(running<peak) dd=true;
-});
-
-let recovered=running>=peak;
-
-let text=`Over the initial 30-day period following onboarding, the account ${dd ? "experienced periods of drawdown" : "maintained relatively stable performance"}. ${dd ? (recovered ? "The system demonstrated the ability to recover from these drawdowns and stabilize performance levels." : "While recovery efforts were observed, the account has not fully retraced prior drawdown levels within this period.") : ""}
-
-A total of ${totalTrades} trades were executed during this timeframe, resulting in a total closed performance of $${fmt(totalProfit)}. The account reached a balance of $${fmt(endBal)} by the end of the period, reflecting a growth of ${growth30.toFixed(2)}%.
-
-${totalProfit >= 0 ? "Overall, performance indicates that the strategy has been able to navigate market conditions effectively within the observed timeframe." : "Performance remains under pressure, reflecting challenging market conditions during the evaluation window."}`;
-
-ghlNarrative = text;
-
-return `<div style="margin-top:20px">
-<div class="section-title">30 Day Performance Commentary</div>
-<div class="data-item" style="line-height:1.6">${text}</div></div>`;
-}
-
-function showWeekly(){
-document.getElementById("weeklyBox").classList.remove("hidden");
-}
-
-function run(type){
+// ✅ OVERVIEW ALWAYS STAYS
+function renderAccount(){
 
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let start=new Date(first["Close date"]);
-let end,title;
+let startDate=new Date(first["Close date"]);
+let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-if(type==="weekly"){
-let ws=new Date(document.getElementById("weekStart").value);
-let we=new Date(document.getElementById("weekEnd").value);
-start=ws;
-end=we;
-title=`Weekly (${ws.toLocaleDateString()} - ${we.toLocaleDateString()})`;
-}else{
-let days=Number(type);
-end=new Date(start);
-end.setDate(end.getDate()+(days-1));
-title=`${days} Days`;
+let startBal=getBalanceAt(startDate);
+let endBal=getBalanceAt(endDate);
+
+let closed=sum(get(r=>r.Type==="Closed position"));
+let floating=sum(get(r=>r.Type==="Open position"));
+
+let growth=startBal?(closed/startBal)*100:0;
+let duration=calculateDuration(startDate,endDate);
+
+document.getElementById("overview").innerHTML=`
+<div class="section-title">Overview</div>
+
+<div class="data-grid">
+<div class="data-item"><div class="section-title">Balance</div><h2>$${fmt(endBal)}</h2></div>
+<div class="data-item"><div class="section-title">Growth</div><h2>${growth.toFixed(2)}%</h2></div>
+<div class="data-item"><div class="section-title">Closed Profit</div><strong>$${fmt(closed)}</strong></div>
+<div class="data-item"><div class="section-title">Floating</div><strong>$${fmt(floating)}</strong></div>
+</div>
+
+<div class="note">
+This reflects the running performance of the account as of the last activity date.
+</div>
+
+<div style="margin-top:20px"></div>
+
+<div class="section-title">Track Record</div>
+
+<div class="data-grid">
+<div class="data-item">Start: ${startDate.toLocaleDateString()}</div>
+<div class="data-item">Last Activity: ${endDate.toLocaleDateString()}</div>
+<div class="data-item">Duration: ${duration} days</div>
+</div>
+`;
 }
 
-processResult(start,end,title,type);
-
-if(type==="30"){
-document.getElementById("breakdown").innerHTML+=generate30DayNarrative(start,end);
-}
-}
-
-function runDetailed(){
-
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let start=new Date(first["Close date"]);
-let end=new Date();
-end.setDate(end.getDate()-1);
-
-processResult(start,end,"Detailed Review","detailed");
-}
-
+// ✅ ONLY BREAKDOWN CHANGES NOW
 function processResult(start,end,title,type){
 
 let endBal=getBalanceAt(end);
@@ -272,61 +234,44 @@ document.getElementById("breakdown").innerHTML=`
 <div class="section-title">${title}</div>
 
 <div class="data-grid">
-<div class="data-item"><div class="section-title">Balance</div><h3>$${fmt(endBal)}</h3></div>
-<div class="data-item"><div class="section-title">Closed Profit</div><h3>$${fmt(closedTF)}</h3></div>
-<div class="data-item"><div class="section-title">Growth</div><h3>${growthTF.toFixed(2)}%</h3></div>
-<div class="data-item"><div class="section-title">Track Record</div><h3>${duration} days</h3></div>
+<div class="data-item">Balance: $${fmt(endBal)}</div>
+<div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
+<div class="data-item">Growth: ${growthTF.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${duration} days</div>
 </div>
 `;
-
-ghlText=`Software: ${document.getElementById("software").value}
-
-${title}
-
-Balance: $${fmt(endBal)}
-Closed Profit: $${fmt(closedTF)}
-Growth: ${growthTF.toFixed(2)}%
-Track Record: ${duration} days`;
-
-if(type==="30"){
-ghlText += `
-
-${ghlNarrative}`;
 }
 
-lastStats = {title,endBal,closedTF,growthTF,duration};
+function showWeekly(){
+document.getElementById("weeklyBox").classList.remove("hidden");
 }
 
-function copyNote(){
-if(!ghlText) return alert("Run first");
-navigator.clipboard.writeText(ghlText);
-alert("Copied");
+function run(type){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+let start=new Date(first["Close date"]);
+let end=new Date(start);
+end.setDate(end.getDate()+(Number(type)-1));
+
+processResult(start,end,`${type} Days`,type);
 }
 
-// ✅ NEW EMAIL FUNCTION
-function copyEmail(){
+function runDetailed(){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
 
-if(!lastStats.title) return alert("Run a report first");
+let start=new Date(first["Close date"]);
+let end=new Date();
+end.setDate(end.getDate()-1);
 
-let email = `Hi there,
-
-Here is a performance update for the ${lastStats.title} period.
-
-The account currently stands at $${fmt(lastStats.endBal)}, with a total closed result of $${fmt(lastStats.closedTF)}, reflecting a return of ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
-
-During this period, the system executed trades based on prevailing market conditions, adjusting exposure and positioning as opportunities developed. Variations in performance are expected as the strategy responds to changing volatility, liquidity, and directional movement across the market.
-
-Periods of consolidation or drawdown may occur as part of normal system behavior, particularly in less favorable conditions. Conversely, stronger market alignment typically allows for more efficient recovery and progression.
-
-Looking ahead, performance will continue to depend on overall market structure and conditions. As momentum and tradable opportunities improve, the system is designed to capitalize accordingly while maintaining its risk parameters.
-
-Please let me know if you would like a more detailed breakdown.
-
-Best regards`;
-
-navigator.clipboard.writeText(email);
-alert("Email copied");
+processResult(start,end,"Detailed Review","detailed");
 }
+
+function copyNote(){ alert("Run first"); }
+function copyEmail(){ alert("Run first"); }
 
 </script>
 
