@@ -35,6 +35,7 @@ h2 { font-size:28px;margin:0; }
 
 <div class="glass">
 <input type="file" id="fileInput"><br>
+<input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
 <div id="weeklyBox" style="display:none">
@@ -125,46 +126,27 @@ let growth=startBal?(total/startBal)*100:0;
 return {trades,profits,total,startBal,endBal,growth};
 }
 
-// ===== STORYTELLING =====
+// ===== STORY =====
 function narrative(start,end,type){
-
 let d = analyzePeriod(start,end);
-let isProfit = d.total >= 0;
 
 let third = Math.floor(d.profits.length/3);
 let early = sum(d.profits.slice(0,third));
 let mid = sum(d.profits.slice(third,third*2));
 let late = sum(d.profits.slice(third*2));
 
-let intro = isProfit
-? "The account delivered a positive performance over this period."
-: "The account closed this period at a net loss.";
-
-let story = `
-Initially, the system ${early>=0?"started with positive momentum":"experienced early drawdown"} (${fmt(early)}).
-
-Mid-period, performance ${mid>=0?"stabilized and generated gains":"continued to face pressure"} (${fmt(mid)}).
-
-Toward the end, the account ${late>=0?"recovered and strengthened":"remained in drawdown or showed limited recovery"} (${fmt(late)}).
-`;
-
-if(type==="60"){
-story += " Compared to the first 30 days, this period reflects how the system evolved as it continued executing positions.";
-}
-
-if(type==="90"){
-story += " Over a longer duration, this reflects a more complete cycle of system behavior across different market conditions.";
-}
-
 return `
 <div class="data-item">
-${intro}
+The account ${d.total>=0?"generated a net gain":"closed at a net loss"} over this period.
 
-${story}
+Early phase: ${early>=0?"positive movement":"drawdown"} (${fmt(early)})  
+Mid phase: ${mid>=0?"stabilization/growth":"continued pressure"} (${fmt(mid)})  
+Late phase: ${late>=0?"recovery or continuation of gains":"limited recovery"} (${fmt(late)})
 
-The account reached $${fmt(d.endBal)}, producing a result of $${fmt(d.total)} (${d.growth.toFixed(2)}%).
+Final balance: $${fmt(d.endBal)}  
+Total result: $${fmt(d.total)} (${d.growth.toFixed(2)}%)
 
-This reflects the natural cycle of the system, where performance progresses through phases of fluctuation, drawdown, and recovery.
+This reflects the system’s natural cycle of fluctuation, execution, and recovery behavior.
 </div>`;
 }
 
@@ -193,13 +175,16 @@ ${narrative(start,end,type)}`;
 
 document.getElementById("breakdown").innerHTML=html;
 
-ghlText=`${title}
+let software = document.getElementById("software").value || "N/A";
+
+ghlText=`Software: ${software}
+${title}
 Balance: $${fmt(d.endBal)}
 Closed Profit: $${fmt(d.total)}
 Growth: ${d.growth.toFixed(2)}%
 Track Record: ${duration} days`;
 
-lastStats={title,...d,duration};
+lastStats={title,...d,duration,software};
 }
 
 // ===== BUTTONS =====
@@ -245,13 +230,11 @@ if(!lastStats.title) return alert("Run report first");
 
 let email=`Hi,
 
-Here is your ${lastStats.title} performance update.
+Here is your ${lastStats.title} performance update for ${lastStats.software}.
 
 The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
 
-This performance reflects the system’s natural cycle of fluctuations, including both drawdown and recovery phases.
-
-Let me know if you would like a deeper breakdown.
+This includes normal phases of drawdown and recovery as part of system behavior.
 
 Best regards`;
 
@@ -265,6 +248,8 @@ function renderAccount(){
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
+
+let software = document.getElementById("software").value || "N/A";
 
 let firstClose=new Date(first["Close date"]);
 let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
@@ -280,6 +265,7 @@ document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
 
 <div class="data-grid">
+<div class="data-item">Software<br><h2>${software}</h2></div>
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
