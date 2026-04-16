@@ -53,6 +53,7 @@ button:hover { background:#333; }
   margin-bottom:10px;
   text-transform:uppercase;
 }
+.note { font-size:12px;color:#777;margin-top:10px; }
 h2 { font-size:28px;margin:0; }
 </style>
 </head>
@@ -66,14 +67,27 @@ h2 { font-size:28px;margin:0; }
 </div>
 
 <div class="glass">
+
 <input type="file" id="fileInput"><br>
+<input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
+
+<div id="weeklyBox" style="display:none">
+<input type="date" id="weekStart">
+<input type="date" id="weekEnd">
+<button onclick="runWeekly()">Run Weekly</button>
+</div>
 
 <br>
 
+<button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
+<button onclick="runDetailed()">Detailed Review</button>
+<button onclick="copyNote()">Copy GHL</button>
+<button onclick="copyEmail()">Copy Email</button>
+
 </div>
 
 <div id="overview" class="glass"></div>
@@ -84,6 +98,8 @@ h2 { font-size:28px;margin:0; }
 <script>
 
 let rows=[];
+let ghlText="";
+let lastStats={};
 
 const fmt = v => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -157,84 +173,116 @@ let recovered = running >= peak;
 return {trades,total,startBal,endBal,growth,drawdown,recovered,maxDD};
 }
 
-// ===== COMMENTARY ENGINE =====
+// ===== COMMENTARY =====
 function generateNarrative(start,end,type){
 
-let data = analyzePeriod(start,end);
-let isProfit = data.total >= 0;
+let d = analyzePeriod(start,end);
+let isProfit = d.total >= 0;
 
-function behaviorText(){
-if(!data.drawdown) return "The period showed relatively stable execution with minimal drawdown.";
-if(data.drawdown && data.recovered) return "The account experienced drawdown followed by a recovery phase.";
-return "The account is currently in a drawdown phase, with recovery still developing.";
-}
+const tone = isProfit
+? "The system delivered a positive result during this period."
+: "The system closed this period at a net loss.";
 
-function toneIntro(){
-if(isProfit) return "The system delivered a positive result during this period.";
-return "The system closed this period at a net loss.";
-}
+const behavior =
+!d.drawdown ? "Stable execution with minimal drawdown."
+: d.recovered ? "Drawdown occurred followed by recovery."
+: "Currently in drawdown, recovery still developing.";
 
 if(type==="30"){
-return `
-<div class="data-item">
-${toneIntro()}
+return `<div class="data-item">
+${tone}
 
-During the first 30 days, ${data.trades.length} trades were executed.
+${d.trades.length} trades executed.
 
-${behaviorText()}
+${behavior}
 
-The account closed at $${fmt(data.endBal)}, with a result of $${fmt(data.total)} (${data.growth.toFixed(2)}%).
+Closed result: $${fmt(d.total)} | Balance: $${fmt(d.endBal)} (${d.growth.toFixed(2)}%)
 
-This phase represents the system’s initial behavior, where fluctuations, including drawdown, are expected as positions develop.
+This is the initial phase where volatility is expected.
 </div>`;
 }
 
 if(type==="60"){
+let mid=new Date(start); mid.setDate(mid.getDate()+29);
+let f=analyzePeriod(start,mid);
+let s=analyzePeriod(mid,end);
 
-let mid=new Date(start);
-mid.setDate(mid.getDate()+29);
+return `<div class="data-item">
+${tone}
 
-let first30 = analyzePeriod(start,mid);
-let next30 = analyzePeriod(mid,end);
+First 30 days: $${fmt(f.total)}  
+Next 30 days: $${fmt(s.total)}
 
-return `
-<div class="data-item">
-${toneIntro()}
+Balance: $${fmt(d.endBal)} (${d.growth.toFixed(2)}%)
 
-Comparing periods, the first 30 days produced $${fmt(first30.total)}, while the following 30 days resulted in $${fmt(next30.total)}.
+${behavior}
 
-This shows how the system has progressed as it continued operating.
-
-The account now stands at $${fmt(data.endBal)}, reflecting ${data.growth.toFixed(2)}% overall performance.
-
-${behaviorText()}
-
-At this stage, it is common to see either stabilization after early volatility or continued drawdown before recovery develops.
+This stage reflects progression and system stabilization behavior.
 </div>`;
 }
 
 if(type==="90"){
-return `
-<div class="data-item">
-${toneIntro()}
+return `<div class="data-item">
+${tone}
 
-Over the 90-day period, the system has gone through multiple market phases, including both favorable and unfavorable conditions.
+Balance: $${fmt(d.endBal)}  
+Total result: $${fmt(d.total)} (${d.growth.toFixed(2)}%)
 
-The account stands at $${fmt(data.endBal)}, with a total result of $${fmt(data.total)} (${data.growth.toFixed(2)}%).
+${behavior}
 
-${behaviorText()}
+90 days provides a clearer view of system consistency across market conditions.
+</div>`;
+}
 
-This longer duration provides a clearer view of system behavior, where early-stage volatility transitions into more observable performance patterns.
+if(type==="weekly" || type==="detailed"){
+return `<div class="data-item">
+${tone}
 
-Whether in profit or drawdown, the results reflect the system’s natural cycle of fluctuation, execution, and potential recovery over time.
+${d.trades.length} trades executed.
+
+${behavior}
+
+Result: $${fmt(d.total)} (${d.growth.toFixed(2)}%)
 </div>`;
 }
 
 }
 
-// ===== RUN =====
-function run(type){
+// ===== ENGINE =====
+function processResult(start,end,title,type){
 
+let d = analyzePeriod(start,end);
+
+let duration = Math.floor((end-start)/(1000*60*60*24))+1;
+
+let html=`
+<div class="section-title">${title}</div>
+
+<div class="data-grid">
+<div class="data-item">Balance: $${fmt(d.endBal)}</div>
+<div class="data-item">Closed Profit: $${fmt(d.total)}</div>
+<div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${duration} days</div>
+</div>
+
+<div style="margin-top:20px"></div>
+<div class="section-title">Commentary</div>
+${generateNarrative(start,end,type)}
+`;
+
+document.getElementById("breakdown").innerHTML=html;
+
+ghlText=`${title}
+Balance: $${fmt(d.endBal)}
+Closed Profit: $${fmt(d.total)}
+Growth: ${d.growth.toFixed(2)}%
+Track Record: ${duration} days`;
+
+lastStats={title,...d,duration};
+}
+
+// ===== BUTTONS =====
+function run(type){
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
@@ -243,25 +291,51 @@ let start=new Date(first["Close date"]);
 let end=new Date(start);
 end.setDate(end.getDate()+(Number(type)-1));
 
-let data = analyzePeriod(start,end);
+processResult(start,end,type+" Days",type);
+}
 
-let html=`
-<div class="section-title">${type} Day Performance</div>
+function runWeekly(){
+let start=new Date(document.getElementById("weekStart").value);
+let end=new Date(document.getElementById("weekEnd").value);
+processResult(start,end,"Weekly","weekly");
+}
 
-<div class="data-grid">
-<div class="data-item">Balance: $${fmt(data.endBal)}</div>
-<div class="data-item">Closed Profit: $${fmt(data.total)}</div>
-<div class="data-item">Growth: ${data.growth.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${type} days</div>
-</div>
+function runDetailed(){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
 
-<div style="margin-top:20px"></div>
+processResult(new Date(first["Close date"]), new Date(), "Detailed Review","detailed");
+}
 
-<div class="section-title">Commentary</div>
-${generateNarrative(start,end,type)}
-`;
+function showWeekly(){
+document.getElementById("weeklyBox").style.display="block";
+}
 
-document.getElementById("breakdown").innerHTML=html;
+// ===== COPY =====
+function copyNote(){
+if(!ghlText) return alert("Run report first");
+navigator.clipboard.writeText(ghlText);
+alert("Copied to clipboard");
+}
+
+function copyEmail(){
+if(!lastStats.title) return alert("Run report first");
+
+let email=`Hi,
+
+Here is your ${lastStats.title} performance update.
+
+The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
+
+Performance includes both drawdown and recovery phases, which are part of normal system behavior.
+
+Let me know if you would like a deeper breakdown.
+
+Best regards`;
+
+navigator.clipboard.writeText(email);
+alert("Email copied");
 }
 
 // ===== OVERVIEW =====
@@ -285,8 +359,12 @@ document.getElementById("overview").innerHTML=`
 <div class="data-grid">
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
+<div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
+<div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
 </div>
+
+<div class="note">Auto-calculated based on account history</div>
 `;
 }
 
