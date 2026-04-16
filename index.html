@@ -98,6 +98,8 @@ h3 { font-size:22px;margin:0; }
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
 <button onclick="runDetailed()">Detailed Review</button>
+<button onclick="copyNote()">Copy GHL</button>
+<button onclick="copyEmail()">Copy Email</button>
 
 </div>
 
@@ -109,6 +111,9 @@ h3 { font-size:22px;margin:0; }
 <script>
 
 let rows=[];
+let ghlText="";
+let ghlNarrative="";
+let lastStats={};
 
 const fmt = (v) => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -206,7 +211,7 @@ This reflects the running performance of the account as of the last activity dat
 `;
 }
 
-// ✅ RESTORED SUMMARY PARAGRAPH
+// ===== NARRATIVE =====
 function generate30DayNarrative(start,end){
 
 let trades=rows.filter(r=>r.Type==="Closed position" &&
@@ -230,23 +235,14 @@ if(running<peak) dd=true;
 
 let recovered=running>=peak;
 
-return `
-<div style="margin-top:20px">
-<div class="section-title">30 Day Performance Commentary</div>
-<div class="data-item" style="line-height:1.6">
+let text=`Over the initial 30-day period following onboarding, the account ${dd ? "experienced periods of drawdown" : "maintained relatively stable performance"}.
 
-Over the initial 30-day period following onboarding, the account ${dd ? "experienced periods of drawdown" : "maintained relatively stable performance"}. 
-${dd ? (recovered ? "The system demonstrated the ability to recover from these drawdowns and stabilize performance levels." : "While recovery efforts were observed, the account has not fully retraced prior drawdown levels within this period.") : ""}
+A total of ${totalTrades} trades were executed, resulting in a closed performance of $${fmt(totalProfit)}. The account reached $${fmt(endBal)}, reflecting a growth of ${growth30.toFixed(2)}%.
 
-A total of ${totalTrades} trades were executed during this timeframe, resulting in a total closed performance of $${fmt(totalProfit)}. 
-The account reached a balance of $${fmt(endBal)} by the end of the period, reflecting a growth of ${growth30.toFixed(2)}%.
+${totalProfit>=0 ? "Overall performance remains constructive given current market conditions." : "Performance remains under pressure given current market conditions."}`;
 
-${totalProfit >= 0 
-? "Overall, performance indicates that the strategy has been able to navigate market conditions effectively within the observed timeframe." 
-: "Performance remains under pressure, reflecting challenging market conditions during the evaluation window."}
-
-</div>
-</div>`;
+ghlNarrative=text;
+return `<div style="margin-top:20px"><div class="section-title">30 Day Performance Commentary</div><div class="data-item">${text}</div></div>`;
 }
 
 function processResult(start,end,title,type){
@@ -266,26 +262,32 @@ else if(type==="60") duration=60;
 else if(type==="90") duration=90;
 else duration=calculateDuration(start,end);
 
-let html = `
-<div class="section-title">${title}</div>
-
+let html=`<div class="section-title">${title}</div>
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
 <div class="data-item">Growth: ${growthTF.toFixed(2)}%</div>
 <div class="data-item">Track Record: ${duration} days</div>
-</div>
-`;
+</div>`;
 
 if(type==="30"){
-html += generate30DayNarrative(start,end);
+html+=generate30DayNarrative(start,end);
 }
 
-document.getElementById("breakdown").innerHTML = html;
+document.getElementById("breakdown").innerHTML=html;
+
+ghlText=`${title}
+
+Balance: $${fmt(endBal)}
+Closed Profit: $${fmt(closedTF)}
+Growth: ${growthTF.toFixed(2)}%
+Track Record: ${duration} days`;
+
+if(type==="30"){
+ghlText+=`\n\n${ghlNarrative}`;
 }
 
-function showWeekly(){
-document.getElementById("weeklyBox").classList.remove("hidden");
+lastStats={title,endBal,closedTF,growthTF,duration};
 }
 
 function run(type){
@@ -310,6 +312,37 @@ let end=new Date();
 end.setDate(end.getDate()-1);
 
 processResult(start,end,"Detailed Review","detailed");
+}
+
+// ✅ COPY FUNCTIONS BACK
+function copyNote(){
+if(!ghlText) return alert("Run first");
+navigator.clipboard.writeText(ghlText);
+alert("Copied");
+}
+
+function copyEmail(){
+
+if(!lastStats.title) return alert("Run a report first");
+
+let email=`Hi there,
+
+Here is a performance update for the ${lastStats.title} period.
+
+The account currently stands at $${fmt(lastStats.endBal)}, with a total closed result of $${fmt(lastStats.closedTF)}, reflecting a return of ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
+
+Performance will continue to depend on prevailing market conditions. Periods of drawdown or consolidation may occur, particularly during less favorable environments, while stronger conditions typically allow for more consistent progression.
+
+Please let me know if you would like a more detailed breakdown.
+
+Best regards`;
+
+navigator.clipboard.writeText(email);
+alert("Email copied");
+}
+
+function showWeekly(){
+document.getElementById("weeklyBox").classList.remove("hidden");
 }
 
 </script>
