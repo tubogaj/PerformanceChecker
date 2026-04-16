@@ -11,7 +11,6 @@ body {
   padding: 50px;
   color: #111;
 }
-
 .container { max-width:1100px;margin:auto; }
 
 .glass {
@@ -23,21 +22,12 @@ body {
   border:1px solid rgba(0,0,0,0.05);
 }
 
-.header { display:flex;justify-content:space-between;align-items:center; }
-
-input {
-  padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px;
-}
+input { padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px; }
 
 button {
-  padding:10px 16px;
-  border:none;border-radius:8px;
-  background:#111;color:#fff;
-  cursor:pointer;
+  padding:10px 16px;border:none;border-radius:8px;
+  background:#111;color:#fff;cursor:pointer;
 }
-button:hover { background:#333; }
-
-.hidden { display:none; }
 
 .data-grid {
   display:grid;
@@ -46,24 +36,14 @@ button:hover { background:#333; }
 }
 
 .data-item {
-  background:#fff;
-  padding:15px;
-  border-radius:10px;
-  border:1px solid #eee;
+  background:#fff;padding:15px;border-radius:10px;border:1px solid #eee;
 }
 
 .section-title {
-  font-size:13px;
-  color:#666;
-  margin-bottom:10px;
-  text-transform:uppercase;
+  font-size:13px;color:#666;margin-bottom:10px;text-transform:uppercase;
 }
 
-.note {
-  font-size:12px;
-  color:#777;
-  margin-top:10px;
-}
+.note { font-size:12px;color:#777;margin-top:10px; }
 
 h2 { font-size:28px;margin:0; }
 </style>
@@ -73,20 +53,20 @@ h2 { font-size:28px;margin:0; }
 
 <div class="container">
 
-<div class="glass header">
-  <h2>Account Performance Checker</h2>
+<div class="glass">
+<h2>Account Performance Checker</h2>
 </div>
 
 <div class="glass">
 
-<input type="file" id="fileInput" accept=".csv"><br>
+<input type="file" id="fileInput"><br>
 <input type="text" id="software" placeholder="Software">
 <input type="date" id="onboarding">
 
-<div id="weeklyBox" class="hidden">
-  <input type="date" id="weekStart">
-  <input type="date" id="weekEnd">
-  <button onclick="runWeekly()">Run Weekly</button>
+<div id="weeklyBox" style="display:none">
+<input type="date" id="weekStart">
+<input type="date" id="weekEnd">
+<button onclick="runWeekly()">Run Weekly</button>
 </div>
 
 <br>
@@ -112,110 +92,120 @@ let rows=[];
 let ghlText="";
 let lastStats={};
 
-const fmt = (v) => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = v => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
 document.getElementById("fileInput").addEventListener("change",init);
 document.getElementById("onboarding").addEventListener("change",init);
 
 function init(){
-  const file=document.getElementById("fileInput").files[0];
-  const onboard=document.getElementById("onboarding").value;
+const file=document.getElementById("fileInput").files[0];
+const onboard=document.getElementById("onboarding").value;
+if(!file||!onboard) return;
 
-  if(!file || !onboard) return;
-
-  const reader=new FileReader();
-  reader.onload=e=>{
-    rows=parseCSV(e.target.result);
-    renderAccount(); // ✅ autopopulate FIXED
-  };
-  reader.readAsText(file);
+const reader=new FileReader();
+reader.onload=e=>{
+rows=parseCSV(e.target.result);
+renderAccount();
+};
+reader.readAsText(file);
 }
 
 function parseCSV(text){
-  const lines=text.split("\n").filter(l=>l.trim());
-  const headers=lines[1].split(",");
-  return lines.slice(2).map(line=>{
-    const values=line.split(",");
-    let obj={};
-    headers.forEach((h,i)=>obj[h.trim()]=values[i]?.trim());
-    return obj;
-  });
+const lines=text.split("\n").filter(l=>l.trim());
+const headers=lines[1].split(",");
+return lines.slice(2).map(l=>{
+const v=l.split(",");
+let o={};
+headers.forEach((h,i)=>o[h.trim()]=v[i]?.trim());
+return o;
+});
 }
 
-function sum(arr){ return arr.reduce((s,v)=>s+v,0); }
+function sum(a){return a.reduce((s,v)=>s+v,0);}
+function get(c){return rows.filter(c).map(r=>Number(r["Net profit"])||0);}
 
-function get(cond){
-  return rows.filter(cond).map(r=>Number(r["Net profit"])||0);
+function getFirstClose(o){
+return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o)
+.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
-function getFirstClose(onboard){
-  return rows
-    .filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=onboard)
-    .sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
+function getBalanceAt(d){
+let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d));
+let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=d));
+let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
+return dep-wd+cl;
 }
 
-function getBalanceAt(date){
-  let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=date));
-  let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=date));
-  let closed=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=date));
-  return dep-wd+closed;
-}
-
+// ===== OVERVIEW =====
 function renderAccount(){
-
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
 if(!first) return;
 
-let startDate=new Date(first["Close date"]);
-let endDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let start=new Date(first["Close date"]);
+let end=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-let endBal=getBalanceAt(endDate);
+let startBal=getBalanceAt(start);
+let endBal=getBalanceAt(end);
 let closed=sum(get(r=>r.Type==="Closed position"));
 
-let growth = (closed/getBalanceAt(startDate))*100;
+let growth=startBal?(closed/startBal)*100:0;
 
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
-
 <div class="data-grid">
-<div class="data-item"><div class="section-title">Balance</div><h2>$${fmt(endBal)}</h2></div>
-<div class="data-item"><div class="section-title">Growth</div><h2>${growth.toFixed(2)}%</h2></div>
-<div class="data-item"><div class="section-title">Closed Profit</div><strong>$${fmt(closed)}</strong></div>
+<div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
+<div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
+<div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
 </div>
+<div class="note">Running performance as of last activity date</div>
 `;
 }
 
-// ===== ADAPTIVE COMMENTARY =====
+// ===== ADVANCED NARRATIVE =====
 function generateNarrative(start,end,type){
 
-let profits=get(r=>r.Type==="Closed position" &&
+let trades=rows.filter(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
 new Date(r["Close date"])<=end);
 
+let profits=trades.map(r=>Number(r["Net profit"])||0);
 let total=sum(profits);
 
 let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
 let growth=startBal?(total/startBal)*100:0;
 
-let tone = total>0
-? "The account closed the period in profit."
-: total<0
-? "The account closed at a net loss due to market conditions."
-: "The account remained near break-even.";
+// drawdown logic
+let running=0, peak=0, drawdown=false;
+profits.forEach(p=>{
+running+=p;
+if(running>peak) peak=running;
+if(running<peak) drawdown=true;
+});
+
+let recovered=running>=peak;
+
+let behavior=
+drawdown
+? (recovered
+  ? "The account experienced drawdown followed by recovery toward the end of the period."
+  : "The account experienced drawdown with recovery still in progress.")
+: "The account maintained stable performance without significant drawdown.";
 
 return `
 <div style="margin-top:20px">
-<div class="section-title">${type} Day Commentary</div>
+<div class="section-title">${type} Day Performance Commentary</div>
 <div class="data-item">
-${tone}
 
-Closed: $${fmt(total)}  
-Balance: $${fmt(endBal)}  
-Growth: ${growth.toFixed(2)}%
+During this period, ${trades.length} trades were executed.
 
-Performance remains dependent on market conditions.
+${behavior}
+
+The account generated a closed result of $${fmt(total)}, reaching a balance of $${fmt(endBal)}, reflecting a growth of ${growth.toFixed(2)}%.
+
+Overall, the system's performance reflects its response to prevailing market conditions, where both drawdown and recovery phases are part of normal operational behavior.
+
 </div></div>`;
 }
 
@@ -230,12 +220,21 @@ new Date(r["Close date"])<=end));
 let startBal=getBalanceAt(start);
 let growthTF=startBal?(closedTF/startBal)*100:0;
 
-let html=`<div class="section-title">${title}</div>
+let duration =
+type==="30"?30:
+type==="60"?60:
+type==="90"?90:
+Math.floor((end-start)/(1000*60*60*24))+1;
+
+let html=`
+<div class="section-title">${title}</div>
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(closedTF)}</div>
 <div class="data-item">Growth: ${growthTF.toFixed(2)}%</div>
-</div>`;
+<div class="data-item">Track Record: ${duration} days</div>
+</div>
+`;
 
 if(type==="30"||type==="60"||type==="90"){
 html+=generateNarrative(start,end,type);
@@ -243,33 +242,27 @@ html+=generateNarrative(start,end,type);
 
 document.getElementById("breakdown").innerHTML=html;
 
-ghlText=`${title}
-Balance: $${fmt(endBal)}
-Closed Profit: $${fmt(closedTF)}
-Growth: ${growthTF.toFixed(2)}%`;
+ghlText=title+"\nBalance: $"+fmt(endBal)+"\nClosed Profit: $"+fmt(closedTF)+"\nGrowth: "+growthTF.toFixed(2)+"%\nTrack Record: "+duration+" days";
 
-lastStats={title,endBal,closedTF,growthTF};
+lastStats={title,endBal,closedTF,growthTF,duration};
 }
 
-// ===== BUTTON FIXES =====
+// ===== BUTTONS =====
 function run(type){
 const onboard=new Date(document.getElementById("onboarding").value);
 const first=getFirstClose(onboard);
-if(!first) return alert("Upload file + onboarding");
+if(!first) return;
 
 let start=new Date(first["Close date"]);
 let end=new Date(start);
 end.setDate(end.getDate()+(Number(type)-1));
 
-processResult(start,end,`${type} Days`,type);
+processResult(start,end,type+" Days",type);
 }
 
 function runWeekly(){
 let start=new Date(document.getElementById("weekStart").value);
 let end=new Date(document.getElementById("weekEnd").value);
-
-if(!start || !end) return alert("Select dates");
-
 processResult(start,end,"Weekly","weekly");
 }
 
@@ -295,13 +288,13 @@ if(!lastStats.title) return alert("Run report first");
 
 let email=`Hi,
 
-Update for ${lastStats.title}:
+Here is the performance update for ${lastStats.title}.
 
-Balance: $${fmt(lastStats.endBal)}
-Closed Profit: $${fmt(lastStats.closedTF)}
-Growth: ${lastStats.growthTF.toFixed(2)}%
+The account stands at $${fmt(lastStats.endBal)} with a closed result of $${fmt(lastStats.closedTF)}, reflecting ${lastStats.growthTF.toFixed(2)}% over ${lastStats.duration} days.
 
-Performance depends on market conditions.
+Performance continues to be influenced by market conditions, with periods of drawdown and recovery forming part of the system’s normal behavior.
+
+Please let me know if you would like further details.
 
 Best regards`;
 
@@ -310,7 +303,7 @@ alert("Copied");
 }
 
 function showWeekly(){
-document.getElementById("weeklyBox").classList.remove("hidden");
+document.getElementById("weeklyBox").style.display="block";
 }
 
 </script>
