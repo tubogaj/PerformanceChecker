@@ -126,12 +126,9 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 }
 
 .guide-box {
-  width:900px;
-  height:600px;
-  background:#fff;
-  border-radius:16px;
-  display:flex;
-  overflow:hidden;
+  width:95%;
+  max-width:1300px;
+  height:90%;
 }
 
 .guide-menu {
@@ -149,9 +146,7 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 .guide-menu div:hover { background:#333; }
 
 .guide-content {
-  flex:1;
-  padding:25px;
-  overflow:auto;
+  padding:30px;
 }
 
 .close-btn {
@@ -200,9 +195,16 @@ button:hover { background:#333; }
 <input type="date" id="onboarding">
 
 <div id="weeklyBox" style="display:none">
-<input type="date" id="weekStart">
-<input type="date" id="weekEnd">
-<button onclick="runWeekly()">Run Weekly</button>
+  <input type="date" id="weekStart">
+  <input type="date" id="weekEnd">
+  <button onclick="runWeekly()">Run Weekly</button>
+</div>
+
+<!-- NEW CUSTOM BOX -->
+<div id="customBox" style="display:none">
+  <input type="date" id="customStart">
+  <input type="date" id="customEnd">
+  <button onclick="runCustom()">Run Custom</button>
 </div>
 
 <br><br>
@@ -212,6 +214,7 @@ button:hover { background:#333; }
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
 <button onclick="showDetailed()">Detailed Review</button>
+<button onclick="showCustom()">Custom</button>
 <button onclick="copyNote()">Copy to GHL</button>
 <button onclick="copyEmail()">Copy to Email</button>
 
@@ -268,10 +271,25 @@ function openGuide(){
 function closeGuide(){
   document.getElementById("guideModal").style.display="none";
 }  
-function hideAllDateSelectors(){ weeklyBox.style.display="none"; }
+function hideAllDateSelectors(){
+  weeklyBox.style.display="none";
+  customBox.style.display="none";
+}
 function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
 function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
+function showCustom(){
+  hideAllDateSelectors();
+  document.getElementById("customBox").style.display="block";
+}
 
+function runCustom(){
+  let s = document.getElementById("customStart").value;
+  let e = document.getElementById("customEnd").value;
+
+  if(!s || !e) return alert("Select dates");
+
+  render(new Date(s), new Date(e), "Custom Review", "custom");
+}
 function runWeekly(){
   if(!weekStart.value || !weekEnd.value) return alert("Select dates");
   render(new Date(weekStart.value), new Date(weekEnd.value), "Weekly Review","weekly");
@@ -535,13 +553,13 @@ function loadGuide(type){
 
   document.getElementById("guideContent").innerHTML = guideData[type];
 
-  // ACTIVE STATE
   document.querySelectorAll(".guide-menu div")
     .forEach(el => el.classList.remove("active"));
 
-  event.target.classList.add("active");
+  // FIX: safe event handling
+  let activeBtn = document.querySelector(`[onclick="loadGuide('${type}')"]`);
+  if(activeBtn) activeBtn.classList.add("active");
 
-  // SYSTEM TEXT (CALC TAB)
   if(type==="calc"){
     let system = document.getElementById("software").value;
     if(system){
@@ -776,26 +794,19 @@ function copyNote(){
 
   let content = "";
 
-  // detect if current view is weekly
   let title = document.querySelector(".section-title")?.innerText || "";
 
   if(title.toLowerCase().includes("weekly")){
-    
-    // ✅ WEEKLY → ONLY DATA GRID
     let grid = document.querySelector(".data-grid-5");
-
     content = grid ? grid.innerText : "";
-
   } else {
-
-    // ✅ OTHER TYPES → FULL CONTENT
     content = document.getElementById("breakdown").innerText;
   }
 
-  navigator.clipboard.writeText(content.replace(/
-{3,}/g,"
+  navigator.clipboard.writeText(
+    content.replace(/\n{3,}/g,"\n\n").trim()
+  );
 
-").trim());
   alert("Copied for GHL");
 }
 function copyEmail(){ navigator.clipboard.writeText(ghlText); alert("Copied for Email"); }
