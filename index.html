@@ -18,7 +18,7 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 }
 
 .header { display:flex; justify-content:space-between; align-items:center; }
-.logo { height:40px; }
+.logo { height:200px; }
 
 .file-row { display:flex; align-items:center; gap:15px; margin-bottom:10px; }
 
@@ -334,22 +334,28 @@ function render(start,end,title,type){
 
 let d=analyze(start,end);
 
-let html=`<div class="section-title">${title}</div>
+let first=getFirstClose(new Date(onboarding.value));
+let firstDate=new Date(first["Close date"]);
+let lastDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+
+let track=Math.floor((lastDate-firstDate)/(1000*60*60*24))+1;
+
+let html=`
+<div class="section-title">${title}</div>
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(d.endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(d.total)}</div>
 <div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${track} days</div>
 </div>`;
-
-if(["30","60","90"].includes(type)){
-html+=`<div class="section-title">Performance Summary</div>${generateNarrative(start,end,type)}`;
-}
 
 if(type==="detailed"){
 html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
 }
 
 breakdown.innerHTML=html;
+ghlText=html.replace(/<[^>]*>/g,'');
+
 }
 
 // ===== OVERVIEW =====
