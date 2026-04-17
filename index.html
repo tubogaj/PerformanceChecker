@@ -257,30 +257,7 @@ button:hover { background:#333; }
 
 </div>
   
-<script>
-
-window.onload = function(){
-
-  weeklyBox = document.getElementById("weeklyBox");
-  customBox = document.getElementById("customBox");
-
-  weekStart = document.getElementById("weekStart");
-  weekEnd = document.getElementById("weekEnd");
-
-  customStart = document.getElementById("customStart");
-  customEnd = document.getElementById("customEnd");
-
-  fileInput = document.getElementById("fileInput");
-  onboarding = document.getElementById("onboarding");
-  software = document.getElementById("software");
-
-  overview = document.getElementById("overview");
-  breakdown = document.getElementById("breakdown");
-
-  fileInput.onchange = init;
-  onboarding.onchange = init;
-  software.onchange = renderAccount;
-};  
+<script defer>
   
 function openGuide(){
   document.getElementById("guideModal").style.display="flex";
@@ -322,11 +299,21 @@ function runWeekly(){
 
 let rows=[], ghlText="";
 // ===== FIX MISSING ELEMENT REFERENCES =====
-let weeklyBox, customBox;
-let weekStart, weekEnd;
-let customStart, customEnd;
-let fileInput, onboarding, software;
-let overview, breakdown;
+const weeklyBox = document.getElementById("weeklyBox");
+const customBox = document.getElementById("customBox");
+
+const weekStart = document.getElementById("weekStart");
+const weekEnd = document.getElementById("weekEnd");
+
+const customStart = document.getElementById("customStart");
+const customEnd = document.getElementById("customEnd");
+
+const fileInput = document.getElementById("fileInput");
+const onboarding = document.getElementById("onboarding");
+const software = document.getElementById("software");
+
+const overview = document.getElementById("overview");
+const breakdown = document.getElementById("breakdown");
 const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
 fileInput.onchange=init;
