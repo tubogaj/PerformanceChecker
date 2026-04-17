@@ -805,7 +805,10 @@ if(!onboarding.value){
   return;
 }
 let d=analyze(start,end);
-
+let first=getFirstClose(new Date(onboarding.value));
+let last=getLastActivity();
+let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
+  
 let html=`
 <div class="section-title">${title}</div>
 <div class="data-grid-5">
@@ -841,10 +844,21 @@ overview.innerHTML=`
 
 <div class="data-grid-5">
 <div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
-<div class="data-item">Balance<br><h3>$${fmt(getBalanceAt(last))}</h3></div>
-<div class="data-item">Closed Profit<br><h3>$${fmt(sum(get(r=>r.Type==="Closed position")))}</h3></div>
+<div class="data-item">Balance<br><h3>$${fmt(d.endBal)}</h3></div>
+<div class="data-item">Closed Profit<br><h3>$${fmt(d.total)}</h3></div>
 <div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
-<div class="data-item">Growth<br><h3>${((sum(get(r=>r.Type==="Closed position"))/getBalanceAt(new Date(first["Close date"])))*100||0).toFixed(2)}%</h3></div>
+<div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
+</div>
+
+${type==="weekly" ? `
+<br>
+<div class="data-grid-4">
+  <div class="data-item">Track Record<br><h3>${track} days</h3></div>
+  <div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
+  <div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
+  <div class="data-item"></div>
+</div>
+` : ""}
 </div>
 
 <br>
