@@ -179,6 +179,7 @@ button:hover { background:#333; }
 <script>
 function openGuide(){
   document.getElementById("guideModal").style.display="flex";
+  loadGuide('how');
 }
 function closeGuide(){
   document.getElementById("guideModal").style.display="none";
@@ -430,7 +431,16 @@ Last Activity Date − First Close Date</p>
 `
 };
 
-  
+function loadGuide(type){
+  document.getElementById("guideContent").innerHTML = guideData[type];
+
+  if(type==="calc"){
+    let system = document.getElementById("software").value;
+    if(system){
+      document.getElementById("systemGuideText").innerText = systemNarrative(system);
+    }
+  }
+}
 // ===== SYSTEM =====
 function systemNarrative(system){
 if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
