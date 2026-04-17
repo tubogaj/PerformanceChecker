@@ -7,6 +7,7 @@
 <style>
 body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; color:#111; }
 .container { max-width:1100px;margin:auto; }
+
 .glass {
   background: rgba(255,255,255,0.75);
   backdrop-filter: blur(18px);
@@ -15,15 +16,61 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   margin-bottom: 20px;
   border:1px solid rgba(0,0,0,0.05);
 }
-input, select { padding:10px;border-radius:8px;border:1px solid #ddd;margin:5px; }
-button { padding:10px 16px;border:none;border-radius:8px;background:#111;color:#fff;cursor:pointer; }
+
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.logo { height:40px; }
+
+.file-row {
+  display:flex;
+  align-items:center;
+  gap:15px;
+  margin-bottom:10px;
+}
+
+input, select {
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  margin:5px;
+}
+
+button {
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#111;
+  color:#fff;
+  cursor:pointer;
+}
 button:hover { background:#333; }
 
-.data-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px; }
-.data-item { background:#fff;padding:15px;border-radius:10px;border:1px solid #eee; }
-.section-title { font-size:13px;color:#666;margin-bottom:10px;text-transform:uppercase; }
-.note { font-size:12px;color:#777;margin-top:10px; }
+.data-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:12px;
+}
+
+.data-item {
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #eee;
+}
+
+.section-title {
+  font-size:13px;
+  color:#666;
+  margin-bottom:10px;
+  text-transform:uppercase;
+}
+
 h2 { font-size:28px;margin:0; }
+
 </style>
 </head>
 
@@ -31,11 +78,17 @@ h2 { font-size:28px;margin:0; }
 
 <div class="container">
 
-<div class="glass"><h2>Account Performance Checker</h2></div>
+<div class="glass header">
+  <h2>Account Performance Checker</h2>
+  <img src="logo.png" class="logo">
+</div>
 
 <div class="glass">
 
-<input type="file" id="fileInput"><br>
+<div class="file-row">
+  <input type="file" id="fileInput">
+  <button onclick="openGuide()">Guide / Library</button>
+</div>
 
 <select id="software">
 <option value="">Select System</option>
@@ -132,22 +185,22 @@ let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 return dep-wd+cl;
 }
 
-// ===== FIXED TOTAL CAPITAL =====
+// ✅ FIXED TOTAL CAPITAL
 function getTotalCapital(onboardingDate){
 
 let onboarding = new Date(onboardingDate);
 
-// balance BEFORE or AT onboarding
+// balance on or before onboarding
 let baseBalance = getBalanceAt(onboarding);
 
-// deposits AFTER onboarding
+// deposits after onboarding
 let depositsAfter = sum(get(r =>
 r.Type==="Deposit" &&
 Number(r["Net profit"])>0 &&
 new Date(r["Close date"])>=onboarding
 ));
 
-// withdrawals AFTER onboarding
+// withdrawals after onboarding
 let withdrawalsAfter = sum(get(r =>
 (r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) &&
 new Date(r["Close date"])>=onboarding
@@ -156,9 +209,8 @@ new Date(r["Close date"])>=onboarding
 return baseBalance + depositsAfter + withdrawalsAfter;
 }
 
-// ===== PURE TRADING GROWTH =====
+// ===== ANALYSIS =====
 function analyzePeriod(start,end){
-
 let trades=rows.filter(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
 new Date(r["Close date"])<=end);
@@ -168,10 +220,99 @@ let total=sum(profits);
 
 let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
-
-let growth = startBal ? (total/startBal)*100 : 0;
+let growth=startBal?(total/startBal)*100:0;
 
 return {trades,total,startBal,endBal,growth};
+}
+
+// ===== ENGINE =====
+function processResult(start,end,title,type){
+
+let d=analyzePeriod(start,end);
+let duration=calcDaysInclusive(start,end);
+
+let html=`
+<div class="section-title">${title}</div>
+
+<div class="data-grid">
+<div class="data-item">Balance: $${fmt(d.endBal)}</div>
+<div class="data-item">Closed Profit: $${fmt(d.total)}</div>
+<div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
+<div class="data-item">Track Record: ${duration} days</div>
+</div>
+`;
+
+document.getElementById("breakdown").innerHTML=html;
+
+let system=document.getElementById("software").value||"N/A";
+
+ghlText=`System: ${system}
+${title}
+Balance: $${fmt(d.endBal)}
+Closed Profit: $${fmt(d.total)}
+Growth: ${d.growth.toFixed(2)}%
+Track Record: ${duration} days`;
+
+lastStats={title,...d,duration,system};
+}
+
+// ===== BUTTONS =====
+function run(type){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+let start=new Date(first["Close date"]);
+let end=new Date(start);
+end.setDate(end.getDate()+(Number(type)-1));
+
+processResult(start,end,type+" Days",type);
+}
+
+function runWeekly(){
+let start=new Date(document.getElementById("weekStart").value);
+let end=new Date(document.getElementById("weekEnd").value);
+processResult(start,end,"Weekly","weekly");
+}
+
+function runDetailed(){
+const onboard=new Date(document.getElementById("onboarding").value);
+const first=getFirstClose(onboard);
+if(!first) return;
+
+processResult(new Date(first["Close date"]), new Date(), "Detailed Review","detailed");
+}
+
+function showWeekly(){
+document.getElementById("weeklyBox").style.display="block";
+}
+
+function openGuide(){
+window.open("guide.html","_blank");
+}
+
+// ===== COPY =====
+function copyNote(){
+if(!ghlText) return alert("Run report first");
+navigator.clipboard.writeText(ghlText);
+alert("Copied");
+}
+
+function copyEmail(){
+if(!lastStats.title) return alert("Run report first");
+
+let email=`Hi,
+
+Here is your ${lastStats.title} performance update for ${lastStats.system}.
+
+The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
+
+Performance remains dependent on market conditions.
+
+Best regards`;
+
+navigator.clipboard.writeText(email);
+alert("Copied");
 }
 
 // ===== OVERVIEW =====
@@ -191,10 +332,9 @@ let duration=calcDaysInclusive(firstClose,lastActivity);
 let endBal=getBalanceAt(lastActivity);
 let closed=sum(get(r=>r.Type==="Closed position"));
 let startBal=getBalanceAt(firstClose);
-
 let growth=startBal?(closed/startBal)*100:0;
 
-// 🔥 FIXED TOTAL CAPITAL
+// ✅ RESTORED TOTAL CAPITAL
 let totalCapital=getTotalCapital(onboard);
 
 document.getElementById("overview").innerHTML=`
@@ -210,8 +350,6 @@ document.getElementById("overview").innerHTML=`
 <div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
 </div>
-
-<div class="note">Total Capital = balance at onboarding + deposits after onboarding - withdrawals after onboarding</div>
 `;
 }
 
