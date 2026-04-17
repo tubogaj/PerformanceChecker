@@ -6,7 +6,7 @@
 
 <style>
 body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; color:#111; }
-.container { max-width:1100px;margin:auto; }
+.container { max-width:1200px;margin:auto; }
 
 .glass {
   background: rgba(255,255,255,0.75);
@@ -17,18 +17,49 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   border:1px solid rgba(0,0,0,0.05);
 }
 
-.header { display:flex; justify-content:space-between; align-items:center; }
-.logo { height:120px; }
-
-.file-row { display:flex; gap:15px; margin-bottom:10px; }
-
-input, select {
-  padding:10px;
-  border-radius:8px;
-  border:1px solid #ddd;
-  margin:5px;
+.data-grid-5 {
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
 }
 
+.data-grid-4 {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+
+.data-item {
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #eee;
+  text-align:center;
+}
+
+.section-title {
+  font-size:13px;
+  color:#666;
+  margin-bottom:10px;
+  text-transform:uppercase;
+}
+
+.guide-modal {
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+.guide-box {
+  width:600px;
+  background:#fff;
+  border-radius:12px;
+  padding:20px;
+}  
 button {
   padding:10px 16px;
   border:none;
@@ -38,26 +69,7 @@ button {
   cursor:pointer;
 }
 button:hover { background:#333; }
-
-.data-grid {
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:12px;
-}
-
-.data-item {
-  background:#fff;
-  padding:15px;
-  border-radius:10px;
-  border:1px solid #eee;
-}
-
-.section-title {
-  font-size:13px;
-  color:#666;
-  margin-bottom:10px;
-  text-transform:uppercase;
-}
+  
 </style>
 </head>
 
@@ -65,20 +77,15 @@ button:hover { background:#333; }
 
 <div class="container">
 
-<div class="glass header">
-  <h2>Account Performance Checker</h2>
-  <img src="logo.png" class="logo">
-</div>
-
 <div class="glass">
-
+<h2>Account Performance Checker</h2>
+<button onclick="openGuide()">Guide</button>
+  
 <input type="file" id="fileInput">
-
 <select id="software">
 <option value="">Select System</option>
-<option>R2</option><option>R2.5</option><option>R10</option>
-<option>R50</option><option>R400</option>
-<option>RX25</option><option>RC30</option>
+<option>R2</option><option>R2.5</option><option>R10</option><option>R50</option>
+<option>R400</option><option>RX25</option><option>RC30</option>
 <option>RX5</option><option>RS15</option><option>RA10</option>
 </select>
 
@@ -90,15 +97,15 @@ button:hover { background:#333; }
 <button onclick="runWeekly()">Run Weekly</button>
 </div>
 
-<br>
+<br><br>
 
 <button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
 <button onclick="showDetailed()">Detailed Review</button>
-<button onclick="copyNote()">Copy GHL</button>
-<button onclick="copyEmail()">Copy Email</button>
+<button onclick="copyNote()">Copy to GHL</button>
+<button onclick="copyEmail()">Copy to Email</button>
 
 </div>
 
@@ -106,10 +113,32 @@ button:hover { background:#333; }
 <div id="breakdown" class="glass"></div>
 
 </div>
-
+  
+<!-- GUIDE MODAL -->
+<div id="guideModal" class="guide-modal">
+  <div class="guide-box">
+    <h3>Guide</h3>
+    <p>Upload CSV → Select onboarding → Choose timeframe → Copy output</p>
+    <button onclick="closeGuide()">Close</button>
+  </div>
+</div>
+  
 <script>
+function openGuide(){
+  document.getElementById("guideModal").style.display="flex";
+}
+function closeGuide(){
+  document.getElementById("guideModal").style.display="none";
+}  
+function hideAllDateSelectors(){ weeklyBox.style.display="none"; }
+function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
+function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
 
-// ===== CORE =====
+function runWeekly(){
+  if(!weekStart.value || !weekEnd.value) return alert("Select dates");
+  render(new Date(weekStart.value), new Date(weekEnd.value), "Weekly Review","weekly");
+}
+
 let rows=[], ghlText="";
 const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -119,7 +148,6 @@ onboarding.onchange=init;
 function init(){
 const file=fileInput.files[0], onboard=onboarding.value;
 if(!file||!onboard) return;
-
 const r=new FileReader();
 r.onload=e=>{ rows=parseCSV(e.target.result); renderAccount(); };
 r.readAsText(file);
@@ -138,44 +166,32 @@ return o;
 const sum=a=>a.reduce((s,v)=>s+v,0);
 const get=c=>rows.filter(c).map(r=>+r["Net profit"]||0);
 
-// ===== SYSTEM DESCRIPTION =====
-function systemNarrative(system){
-if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
-if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
-if(["R10","R50","R400"].includes(system)) return "This reflects a diversified AI allocation model adapting across multiple strategies.";
-if(system==="RX25") return "This reflects adaptive exposure across forex and gold based on volatility.";
-if(system==="RX5") return "This reflects a conservative allocation approach focused on stability.";
-if(system==="RC30") return "This reflects high-volatility crypto market behavior.";
-if(system==="RS15") return "This focuses on intraday execution with event-driven positioning.";
-if(system==="RA10") return "This reflects reversal-based execution targeting turning points.";
-return "This reflects system-based trading behavior.";
+function getFirstClose(o){
+return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o)
+.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
 }
 
-// FLOATING
-function getFloatingPL(){
-return sum(rows.filter(r=>r.Type==="Open position").map(r=>+r["Net profit"]||0));
+function getLastActivity(){
+return new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 }
 
-// TOTAL CAPITAL
-function getTotalCapital(o){
-let d=new Date(o);
-return sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=d))
-- Math.abs(sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=d)));
-}
-
-// BALANCE
 function getBalanceAt(d){
 return sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d))
 - sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=d))
 + sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 }
 
-function getFirstClose(o){
-return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o)
-.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
+function getFloatingPL(){
+return sum(rows.filter(r=>r.Type==="Open position").map(r=>+r["Net profit"]||0));
 }
 
-// ANALYZE
+function getTotalCapital(onboardDate){
+let o=new Date(onboardDate);
+let deposits = sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=o));
+let withdrawals = sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=o));
+return deposits - Math.abs(withdrawals);
+}
+
 function analyze(start,end){
 let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
 let total=sum(trades.map(r=>+r["Net profit"]||0));
@@ -183,55 +199,76 @@ let startBal=getBalanceAt(start);
 return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
 }
 
-// ===== ORIGINAL NARRATIVE + SYSTEM =====
-function narrative(start,end,type){
+// ===== SYSTEM =====
+function systemNarrative(system){
+if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
+if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
+if(["R10","R50","R400"].includes(system)) return "This reflects a diversified AI allocation model adapting across multiple strategies.";
+if(system==="RX25") return "This reflects adaptive exposure across forex and gold based on volatility.";
+if(system==="RX5") return "This reflects a conservative allocation approach focused on stability.";
+if(system==="RC30") return "This reflects high-volatility crypto market behavior.";
+if(system==="RS15") return "This reflects event-driven trading with selective participation.";
+if(system==="RA10") return "This reflects reversal-based execution focused on turning points.";
+return "";
+}
+
+// ===== NARRATIVE =====
+function generateNarrative(start,end,type){
 
 let d=analyze(start,end);
-let system=software.value;
-let isWin=d.total>=0;
+let system=document.getElementById("software").value;
+let positive=d.total>=0;
 
-let tone=isWin
+let tone=positive
 ? "Overall, the system maintained positive performance during this period."
 : "The period reflects a drawdown phase, which is part of normal system behavior under certain market conditions.";
 
-if(type==="30"){
-return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over 30 days, generating $${fmt(d.total)} in closed profit.
+let deposits=sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let withdrawals=sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
 
-${systemNarrative(system)}
+let capitalFlow="";
+if(deposits>0) capitalFlow+=`A deposit of $${fmt(deposits)} was made during this period. `;
+if(Math.abs(withdrawals)>0) capitalFlow+=`A withdrawal of $${fmt(Math.abs(withdrawals))} occurred during this period.`;
 
-${tone}
-
-Performance remains dependent on market conditions.
-</div>`;
-}
+// weekly fallback uses 30
+if(type==="weekly") type="30";
 
 if(type==="60"){
 let mid=new Date(start); mid.setDate(mid.getDate()+29);
-let a=analyze(start,mid), b=analyze(mid,end);
+let first30=analyze(start,mid);
+let next30=analyze(mid,end);
 
 return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over 60 days, generating $${fmt(d.total)} in closed profit.
-
-The first 30 days produced $${fmt(a.total)}, while the next 30 days produced $${fmt(b.total)}.
-
+The account recorded a growth of ${d.growth.toFixed(2)}% over the 60-day period.
+The balance movement during this timeframe reflects both trading activity and capital adjustments. ${capitalFlow}
+The system generated a total closed profit of $${fmt(d.total)} over the period.
+During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}, providing a clear comparison of how performance evolved.
 ${systemNarrative(system)}
-
 ${tone}
-
-Performance remains dependent on market conditions.
+Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
 </div>`;
 }
 
 if(type==="90"){
 return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over 90 days, generating $${fmt(d.total)} in closed profit.
-
+The account recorded a growth of ${d.growth.toFixed(2)}% over the 90-day period.
+The balance movement during this timeframe reflects both trading performance and any capital adjustments made. ${capitalFlow}
+The system generated a total closed profit of $${fmt(d.total)} across the period.
 ${systemNarrative(system)}
-
 ${tone}
+This longer duration provides a clearer view of how the system behaves across different market conditions, including periods of volatility, stability, and recovery.
+Performance remains dependent on market conditions, and variability should still be expected moving forward.
+</div>`;
+}
 
-This reflects how the system behaves across varying market conditions.
+if(type==="30"){
+return `<div class="data-item">
+The account recorded a growth of ${d.growth.toFixed(2)}% over the first 30 days.
+The balance movement reflects early-stage execution along with any capital adjustments. ${capitalFlow}
+The system generated a closed profit of $${fmt(d.total)} during this period.
+${systemNarrative(system)}
+${tone}
+Performance remains dependent on market conditions, and early fluctuations are part of normal system behavior.
 </div>`;
 }
 }
@@ -240,8 +277,6 @@ This reflects how the system behaves across varying market conditions.
 function detailedNarrative(start,end){
 
 let d=analyze(start,end);
-let system=software.value;
-let isWin=d.total>=0;
 
 let balances=[];
 rows.forEach(r=>{
@@ -256,61 +291,61 @@ balances.push({dt,b:getBalanceAt(dt)});
 if(!balances.length) return "";
 
 let initial=balances[0].b;
+let initialDate=balances[0].dt;
+
 let lowest=Math.min(...balances.map(x=>x.b));
-let finalBal=balances.at(-1).b;
+let lowestObj=balances.find(x=>x.b===lowest);
+
+let finalBal=balances[balances.length-1].b;
+
+let belowInitial = lowest < initial;
+let recovered = finalBal > initial;
+
+let ddPct = ((lowest-initial)/initial)*100;
+let recPct = ((finalBal-initial)/initial)*100;
 
 return `<div class="data-item">
-Start: $${fmt(initial)} → Low: $${fmt(lowest)} → Current: $${fmt(finalBal)}
-
-Closed Profit: $${fmt(d.total)}
-Floating P/L: $${fmt(getFloatingPL())}
-
-${systemNarrative(system)}
-
-${isWin?"Account is performing positively.":"Account is in drawdown phase."}
+The account started at $${fmt(initial)} on ${initialDate.toLocaleDateString()}.
+During the selected period, the account reached a low of $${fmt(lowest)} on ${lowestObj.dt.toLocaleDateString()}, representing ${ddPct.toFixed(2)}%.
+${belowInitial ? "The account did go below the initial capital during this period." : "The account remained above the initial capital throughout the period."}
+${recovered ? `The account recovered and is currently above the initial level, now at $${fmt(finalBal)}, representing ${recPct.toFixed(2)}% growth.` : `The account has not fully recovered to the initial level and is currently at $${fmt(finalBal)}.`}
+The system generated a total closed profit of $${fmt(d.total)} during this timeframe.
+Performance remains dependent on market conditions, and fluctuations, including drawdown and recovery, are part of normal system behavior.
 </div>`;
 }
 
-// RUN
+// ===== RUN =====
 function run(type){
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
 let s=new Date(f["Close date"]), e=new Date(s); e.setDate(e.getDate()+(+type-1));
 render(s,e,type+" Days",type);
 }
 
-function runWeekly(){
-render(new Date(weekStart.value),new Date(weekEnd.value),"Weekly");
-}
-
-function showWeekly(){ weeklyBox.style.display="block"; }
-
-function showDetailed(){
+function runDetailed(){
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
 let s=new Date(f["Close date"]);
-let e=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let e=getLastActivity();
 render(s,e,"Detailed Review","detailed");
 }
 
-// RENDER
+// ===== RENDER =====
 function render(start,end,title,type){
 
 let d=analyze(start,end);
 
-let first=getFirstClose(new Date(onboarding.value));
-let last=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
+let html=`
+<div class="section-title">${title}</div>
+<div class="data-grid-5">
+<div class="data-item">Balance<br><h3>$${fmt(d.endBal)}</h3></div>
+<div class="data-item">Closed Profit<br><h3>$${fmt(d.total)}</h3></div>
+<div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
+<div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
+<div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
+</div>
+`;
 
-let html=`<div class="section-title">${title}</div>
-<div class="data-grid">
-<div class="data-item">Balance: $${fmt(d.endBal)}</div>
-<div class="data-item">Closed Profit: $${fmt(d.total)}</div>
-<div class="data-item">Floating P/L: $${fmt(getFloatingPL())}</div>
-<div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${track} days</div>
-</div>`;
-
-if(type==="30"||type==="60"||type==="90"){
-html+=`<div class="section-title">Summary</div>${narrative(start,end,type)}`;
+if(type!=="detailed"){
+html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
 }
 
 if(type==="detailed"){
@@ -321,30 +356,36 @@ breakdown.innerHTML=html;
 ghlText=html.replace(/<[^>]*>/g,'');
 }
 
-// OVERVIEW
+// ===== OVERVIEW =====
 function renderAccount(){
-let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
-let fc=new Date(f["Close date"]);
-let last=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-let closed=sum(get(r=>r.Type==="Closed position"));
-let growth=(closed/getBalanceAt(fc))*100;
+
+let first=getFirstClose(new Date(onboarding.value));
+let last=getLastActivity();
+let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
 
 overview.innerHTML=`
-<div class="section-title">Overview</div>
-<div class="data-grid">
+<div class="section-title">Account Overview</div>
+
+<div class="data-grid-5">
 <div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
 <div class="data-item">Balance<br><h3>$${fmt(getBalanceAt(last))}</h3></div>
+<div class="data-item">Closed Profit<br><h3>$${fmt(sum(get(r=>r.Type==="Closed position")))}</h3></div>
 <div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
-<div class="data-item">Closed Profit<br><h3>$${fmt(closed)}</h3></div>
-<div class="data-item">Growth<br><h3>${growth.toFixed(2)}%</h3></div>
-<div class="data-item">Total Capital<br>$${fmt(getTotalCapital(onboarding.value))}</div>
-<div class="data-item">First Close<br>${fc.toLocaleDateString()}</div>
-<div class="data-item">Last Activity<br>${last.toLocaleDateString()}</div>
-<div class="data-item">Track Record<br>${Math.floor((last-fc)/(1000*60*60*24)+1)} days</div>
-</div>`;
+<div class="data-item">Growth<br><h3>${((sum(get(r=>r.Type==="Closed position"))/getBalanceAt(new Date(first["Close date"])))*100||0).toFixed(2)}%</h3></div>
+</div>
+
+<br>
+
+<div class="data-grid-4">
+<div class="data-item">Total Capital<br><h3>$${fmt(getTotalCapital(onboarding.value))}</h3></div>
+<div class="data-item">Track Record<br><h3>${track} days</h3></div>
+<div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
+<div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
+</div>
+`;
 }
 
-// COPY
+// ===== COPY =====
 function copyNote(){ navigator.clipboard.writeText(ghlText); alert("Copied for GHL"); }
 function copyEmail(){ navigator.clipboard.writeText(ghlText); alert("Copied for Email"); }
 
