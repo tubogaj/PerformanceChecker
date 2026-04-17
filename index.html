@@ -877,7 +877,10 @@ if(type!=="detailed" && type!=="weekly"){
 if(type==="detailed"){
   html += `<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
 }
+breakdown.innerHTML = html;
+ghlText = html.replace(/<[^>]*>/g,'');
 
+}
 // ===== OVERVIEW =====
 function renderAccount(){
 
