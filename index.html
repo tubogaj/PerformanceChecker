@@ -139,11 +139,6 @@ h2 { font-size:28px;margin:0; }
 
 <input type="date" id="onboarding">
 
-<div id="customRange" style="display:none">
-<input type="date" id="customStart">
-<input type="date" id="customEnd">
-</div>
-
 <div id="weeklyBox" style="display:none">
 <input type="date" id="weekStart">
 <input type="date" id="weekEnd">
@@ -232,7 +227,7 @@ weeklyBox.style.display="none";
 customRange.style.display="none";
 }
 function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
-function showDetailed(){ hideAllDateSelectors(); customRange.style.display="block"; runDetailed(); }
+function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
 function openGuide(){
   document.getElementById("guideModal").style.display="flex";
   loadGuide('how');
@@ -430,8 +425,8 @@ render(s,e,type+" Days",type);
 
 function runDetailed(){
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
-let s=customStart.value?new Date(customStart.value):new Date(f["Close date"]);
-let e=customEnd.value?new Date(customEnd.value):new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+let s = new Date(f["Close date"]);
+let e = new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 render(s,e,"Detailed Review","detailed");
 }
 
