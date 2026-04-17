@@ -772,7 +772,32 @@ overview.innerHTML=`
 }
 
 // ===== COPY =====
-function copyNote(){ navigator.clipboard.writeText(ghlText); alert("Copied for GHL"); }
+function copyNote(){
+
+  let content = "";
+
+  // detect if current view is weekly
+  let title = document.querySelector(".section-title")?.innerText || "";
+
+  if(title.toLowerCase().includes("weekly")){
+    
+    // ✅ WEEKLY → ONLY DATA GRID
+    let grid = document.querySelector(".data-grid-5");
+
+    content = grid ? grid.innerText : "";
+
+  } else {
+
+    // ✅ OTHER TYPES → FULL CONTENT
+    content = document.getElementById("breakdown").innerText;
+  }
+
+  navigator.clipboard.writeText(content.replace(/
+{3,}/g,"
+
+").trim());
+  alert("Copied for GHL");
+}
 function copyEmail(){ navigator.clipboard.writeText(ghlText); alert("Copied for Email"); }
 
 </script>
