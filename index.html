@@ -48,8 +48,9 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 
 /* GLASS EFFECT */
 .guide-box {
-  width:950px;
-  height:620px;
+  width:95%;
+  max-width:1300px;
+  height:90%;
   border-radius:20px;
   display:flex;
   overflow:hidden;
@@ -58,7 +59,6 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   backdrop-filter: blur(20px);
   border:1px solid rgba(255,255,255,0.2);
 }
-
 /* MENU */
 .guide-menu {
   width:220px;
@@ -125,12 +125,6 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   z-index:999;
 }
 
-.guide-box {
-  width:95%;
-  max-width:1300px;
-  height:90%;
-}
-
 .guide-menu {
   width:220px;
   background:#111;
@@ -177,7 +171,7 @@ button:hover { background:#333; }
 
 <div class="glass">
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-  <h2>Account Performance Checker</h2>
+  <h1>Account Performance Checker</h1>
   <img src="logo.png" style="height:200px;">
 </div>
   
@@ -272,8 +266,8 @@ function closeGuide(){
   document.getElementById("guideModal").style.display="none";
 }  
 function hideAllDateSelectors(){
-  weeklyBox.style.display="none";
-  customBox.style.display="none";
+  document.getElementById("weeklyBox").style.display="none";
+  document.getElementById("customBox").style.display="none";
 }
 function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
 function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
@@ -689,12 +683,6 @@ if(type==="90"){
   : "The 90-day view shows how extended conditions have impacted overall performance.";
 }
 
-if(type==="weekly"){
-  timeframeText = win
-  ? "This week reflects short-term alignment with market opportunities."
-  : "This week reflects short-term pressure from market conditions.";
-}
-
 return `<div class="data-item">
 
 ${intro}
@@ -794,10 +782,10 @@ function copyNote(){
 
   let content = "";
 
-  let title = document.querySelector(".section-title")?.innerText || "";
+  let title = document.querySelector("#breakdown .section-title")?.innerText || "";
 
   if(title.toLowerCase().includes("weekly")){
-    let grid = document.querySelector(".data-grid-5");
+    let grid = document.querySelector("#breakdown .data-grid-5");
     content = grid ? grid.innerText : "";
   } else {
     content = document.getElementById("breakdown").innerText;
