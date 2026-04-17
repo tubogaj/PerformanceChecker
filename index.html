@@ -155,6 +155,26 @@ button:hover { background:#333; }
   
 <!-- GUIDE MODAL -->
 <div id="guideModal" class="guide-modal">
+
+  <div class="guide-box">
+
+    <!-- MENU -->
+    <div class="guide-menu">
+      <div onclick="loadGuide('how')">How To</div>
+      <div onclick="loadGuide('desc')">Descriptions</div>
+      <div onclick="loadGuide('calc')">Calculations</div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="guide-content" id="guideContent">
+      Select a category
+    </div>
+
+  </div>
+
+  <div class="close-btn" onclick="closeGuide()">✕</div>
+
+</div>
   
 <script>
 function openGuide(){
