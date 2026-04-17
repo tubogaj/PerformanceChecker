@@ -79,9 +79,11 @@ button:hover { background:#333; }
 
 <div class="glass">
 <h2>Account Performance Checker</h2>
-<button onclick="openGuide()">Guide</button>
   
-<input type="file" id="fileInput">
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+  <input type="file" id="fileInput">
+  <button onclick="openGuide()">Guide</button>
+</div>
 <select id="software">
 <option value="">Select System</option>
 <option>R2</option><option>R2.5</option><option>R10</option><option>R50</option>
@@ -217,100 +219,116 @@ function generateNarrative(start,end,type){
 
 let d=analyze(start,end);
 let system=document.getElementById("software").value;
-let positive=d.total>=0;
 
-let tone=positive
-? "Overall, the system maintained positive performance during this period."
-: "The period reflects a drawdown phase, which is part of normal system behavior under certain market conditions.";
+let startBal = getBalanceAt(start);
+let endBal = getBalanceAt(end);
 
-let deposits=sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-let withdrawals=sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+// TOTAL TRADES (PERIOD ONLY)
+let trades = rows.filter(r =>
+  r.Type==="Closed position" &&
+  new Date(r["Close date"])>=start &&
+  new Date(r["Close date"])<=end
+).length;
 
-let capitalFlow="";
-if(deposits>0) capitalFlow+=`A deposit of $${fmt(deposits)} was made during this period. `;
-if(Math.abs(withdrawals)>0) capitalFlow+=`A withdrawal of $${fmt(Math.abs(withdrawals))} occurred during this period.`;
+let win = d.total >= 0;
 
-// weekly fallback uses 30
-if(type==="weekly") type="30";
-
+// ===== 60 DAYS (WITH COMPARISON) =====
 if(type==="60"){
-let mid=new Date(start); mid.setDate(mid.getDate()+29);
-let first30=analyze(start,mid);
-let next30=analyze(mid,end);
+
+let mid = new Date(start);
+mid.setDate(mid.getDate()+29);
+
+let first30 = analyze(start, mid);
+let next30 = analyze(mid, end);
+
+// TREND
+let comparison = "";
+if(next30.total > first30.total){
+  comparison = "Performance improved in the second 30-day period, indicating stronger alignment with market conditions.";
+}
+else if(next30.total < first30.total){
+  comparison = "Performance softened in the second 30-day period, reflecting a shift in market behavior.";
+}
+else{
+  comparison = "Performance remained relatively consistent across both 30-day periods.";
+}
+
+let intro = win
+? `The account closed the 60-day period with a net gain of $${fmt(d.total)}.`
+: `The account closed the 60-day period with a net loss of $${fmt(Math.abs(d.total))}.`;
 
 return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over the 60-day period.
-The balance movement during this timeframe reflects both trading activity and capital adjustments. ${capitalFlow}
-The system generated a total closed profit of $${fmt(d.total)} over the period.
-During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}, providing a clear comparison of how performance evolved.
+
+${intro}
+
+The account balance stands at $${fmt(endBal)}, representing a growth of ${((d.total/startBal)*100||0).toFixed(2)}%.
+
+A total of ${trades} trades were closed, generating $${fmt(d.total)} in closed profit.
+
+During the first 30 days, the account produced $${fmt(first30.total)}, followed by $${fmt(next30.total)} in the next 30 days.
+
+${comparison}
+
+${win
+? "The system is currently capitalizing on market conditions through the following approach:"
+: "The system is currently navigating market conditions using the following approach:"}
+
 ${systemNarrative(system)}
-${tone}
-Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
+
+${win
+? "This indicates the system is aligning well with current market behavior."
+: "This reflects a temporary phase where market conditions are less favorable, which is part of the system’s cycle."}
+
 </div>`;
+}
+
+// ===== OTHER TIMEFRAMES =====
+
+let intro = win
+? `The account generated a net gain of $${fmt(d.total)} during this period.`
+: `The account recorded a net loss of $${fmt(Math.abs(d.total))} during this period.`;
+
+// TIMEFRAME CONTEXT
+let timeframeText="";
+
+if(type==="30"){
+  timeframeText = win
+  ? "The first 30 days reflect a strong initial alignment with market opportunities."
+  : "The first 30 days reflect an early phase where market conditions were less favorable.";
 }
 
 if(type==="90"){
+  timeframeText = win
+  ? "The 90-day period highlights sustained execution across varying market environments."
+  : "The 90-day view shows how extended conditions have impacted overall performance.";
+}
+
+if(type==="weekly"){
+  timeframeText = win
+  ? "This week reflects short-term alignment with market opportunities."
+  : "This week reflects short-term pressure from market conditions.";
+}
+
 return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over the 90-day period.
-The balance movement during this timeframe reflects both trading performance and any capital adjustments made. ${capitalFlow}
-The system generated a total closed profit of $${fmt(d.total)} across the period.
+
+${intro}
+
+${timeframeText}
+
+The account balance is currently at $${fmt(endBal)}, representing a growth of ${((d.total/startBal)*100||0).toFixed(2)}%.
+
+A total of ${trades} trades were closed during this period, generating $${fmt(d.total)} in closed profit.
+
+${win
+? "The system is currently capitalizing on market conditions through the following approach:"
+: "The system is currently navigating market conditions using the following approach:"}
+
 ${systemNarrative(system)}
-${tone}
-This longer duration provides a clearer view of how the system behaves across different market conditions, including periods of volatility, stability, and recovery.
-Performance remains dependent on market conditions, and variability should still be expected moving forward.
-</div>`;
-}
 
-if(type==="30"){
-return `<div class="data-item">
-The account recorded a growth of ${d.growth.toFixed(2)}% over the first 30 days.
-The balance movement reflects early-stage execution along with any capital adjustments. ${capitalFlow}
-The system generated a closed profit of $${fmt(d.total)} during this period.
-${systemNarrative(system)}
-${tone}
-Performance remains dependent on market conditions, and early fluctuations are part of normal system behavior.
-</div>`;
-}
-}
+${win
+? "The system is operating in favorable conditions, allowing efficient execution."
+: "The system is currently experiencing a more challenging environment, which is part of expected performance cycles."}
 
-// ===== DETAILED =====
-function detailedNarrative(start,end){
-
-let d=analyze(start,end);
-
-let balances=[];
-rows.forEach(r=>{
-if(r.Type==="Closed position"){
-let dt=new Date(r["Close date"]);
-if(dt>=start && dt<=end){
-balances.push({dt,b:getBalanceAt(dt)});
-}
-}
-});
-
-if(!balances.length) return "";
-
-let initial=balances[0].b;
-let initialDate=balances[0].dt;
-
-let lowest=Math.min(...balances.map(x=>x.b));
-let lowestObj=balances.find(x=>x.b===lowest);
-
-let finalBal=balances[balances.length-1].b;
-
-let belowInitial = lowest < initial;
-let recovered = finalBal > initial;
-
-let ddPct = ((lowest-initial)/initial)*100;
-let recPct = ((finalBal-initial)/initial)*100;
-
-return `<div class="data-item">
-The account started at $${fmt(initial)} on ${initialDate.toLocaleDateString()}.
-During the selected period, the account reached a low of $${fmt(lowest)} on ${lowestObj.dt.toLocaleDateString()}, representing ${ddPct.toFixed(2)}%.
-${belowInitial ? "The account did go below the initial capital during this period." : "The account remained above the initial capital throughout the period."}
-${recovered ? `The account recovered and is currently above the initial level, now at $${fmt(finalBal)}, representing ${recPct.toFixed(2)}% growth.` : `The account has not fully recovered to the initial level and is currently at $${fmt(finalBal)}.`}
-The system generated a total closed profit of $${fmt(d.total)} during this timeframe.
-Performance remains dependent on market conditions, and fluctuations, including drawdown and recovery, are part of normal system behavior.
 </div>`;
 }
 
