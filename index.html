@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -61,6 +62,7 @@ button:hover { background:#333; }
 
 h2 { font-size:28px;margin:0; }
 </style>
+
 </head>
 
 <body>
@@ -101,13 +103,7 @@ h2 { font-size:28px;margin:0; }
 
 <br>
 
-<button onclick="showWeekly()">Weekly</button>
-<button onclick="run('30')">30 Days</button>
-<button onclick="run('60')">60 Days</button>
-<button onclick="run('90')">90 Days</button>
-<button onclick="showDetailed()">Detailed Review</button>
-<button onclick="copyNote()">Copy GHL</button>
-<button onclick="copyEmail()">Copy Email</button>
+<button onclick="showWeekly()">Weekly</button> <button onclick="run('30')">30 Days</button> <button onclick="run('60')">60 Days</button> <button onclick="run('90')">90 Days</button> <button onclick="showDetailed()">Detailed Review</button> <button onclick="copyNote()">Copy GHL</button> <button onclick="copyEmail()">Copy Email</button>
 
 </div>
 
@@ -167,6 +163,16 @@ return sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d))
 + sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 }
 
+// ✅ FIX 1: ADDED FUNCTION (DO NOT REMOVE)
+function getTotalCapital(onboardDate){
+let o=new Date(onboardDate);
+
+let deposits = sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=o));
+let withdrawals = sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=o));
+
+return deposits - Math.abs(withdrawals);
+}
+
 // ===== ANALYZE =====
 function analyze(start,end){
 let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
@@ -212,63 +218,39 @@ let first30=analyze(start,mid);
 let next30=analyze(mid,end);
 
 return `<div class="data-item">
-
 The account recorded a growth of ${d.growth.toFixed(2)}% over the 60-day period.
-
 The balance movement during this timeframe reflects both trading activity and capital adjustments. ${capitalFlow}
-
 The system generated a total closed profit of $${fmt(d.total)} over the period.
-
 During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}, providing a clear comparison of how performance evolved.
-
 ${systemNarrative(system)}
-
 ${tone}
-
-Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
-
+Performance remains dependent on market conditions, and fluctuations, including drawdown and recovery, are part of normal system behavior.
 </div>`;
 }
 
 if(type==="90"){
 return `<div class="data-item">
-
 The account recorded a growth of ${d.growth.toFixed(2)}% over the 90-day period.
-
 The balance movement during this timeframe reflects both trading performance and any capital adjustments made. ${capitalFlow}
-
 The system generated a total closed profit of $${fmt(d.total)} across the period.
-
 ${systemNarrative(system)}
-
 ${tone}
-
 This longer duration provides a clearer view of how the system behaves across different market conditions, including periods of volatility, stability, and recovery.
-
 Performance remains dependent on market conditions, and variability should still be expected moving forward.
-
 </div>`;
 }
 
 if(type==="30"){
 return `<div class="data-item">
-
 The account recorded a growth of ${d.growth.toFixed(2)}% over the first 30 days.
-
 The balance movement reflects early-stage execution along with any capital adjustments. ${capitalFlow}
-
 The system generated a closed profit of $${fmt(d.total)} during this period.
-
 ${systemNarrative(system)}
-
 ${tone}
-
 Performance remains dependent on market conditions, and early fluctuations are part of normal system behavior.
-
 </div>`;
 }
 }
-
 
 // ===== DETAILED STORY =====
 function detailedNarrative(start,end){
@@ -295,23 +277,15 @@ let lowObj=balances.find(x=>x.b===low);
 let final=balances.at(-1).b;
 
 return `<div class="data-item">
-
 The account started at $${fmt(init)} on ${balances[0].dt.toLocaleDateString()} and progressed through varying market conditions.
-
 At its lowest point, the balance reached $${fmt(low)} on ${lowObj.dt.toLocaleDateString()}, reflecting how the system responded during periods of unfavorable market movement.
-
 ${final>init
 ? `Following this phase, the account demonstrated recovery, reaching $${fmt(final)}, showing the system's ability to adapt and stabilize as conditions improved.`
 : `The account is currently at $${fmt(final)}, reflecting an ongoing drawdown phase where the system continues to manage exposure carefully.`}
-
 ${systemNarrative(system)}
-
-${!positive ? "The master account applies equity protection mechanisms, ensuring positions are managed carefully and exposure is reduced during unfavorable market conditions. This allows the system to slow down and avoid excessive risk while waiting for better opportunities." : ""}
-
+${!positive ? "The master account applies equity protection mechanisms, ensuring positions are managed carefully, and exposure is reduced during unfavorable market conditions. This allows the system to slow down and avoid excessive risk while waiting for better opportunities." : ""}
 Overall, the system generated $${fmt(d.total)} in closed profit over this period.
-
-Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
-
+Performance remains dependent on market conditions, and fluctuations, including drawdown and recovery, are part of normal system behavior.
 </div>`;
 }
 
@@ -347,7 +321,12 @@ let html=`
 <div class="data-item">Closed Profit: $${fmt(d.total)}</div>
 <div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
 <div class="data-item">Track Record: ${track} days</div>
-</div>`;
+</div>
+`;
+
+if(type==="30" || type==="60" || type==="90"){
+html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
+}
 
 if(type==="detailed"){
 html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
