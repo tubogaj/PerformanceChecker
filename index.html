@@ -17,20 +17,10 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   border:1px solid rgba(0,0,0,0.05);
 }
 
-.header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
+.header { display:flex; justify-content:space-between; align-items:center; }
 .logo { height:40px; }
 
-.file-row {
-  display:flex;
-  align-items:center;
-  gap:15px;
-  margin-bottom:10px;
-}
+.file-row { display:flex; align-items:center; gap:15px; margin-bottom:10px; }
 
 input, select {
   padding:10px;
@@ -70,7 +60,6 @@ button:hover { background:#333; }
 }
 
 h2 { font-size:28px;margin:0; }
-
 </style>
 </head>
 
@@ -92,19 +81,17 @@ h2 { font-size:28px;margin:0; }
 
 <select id="software">
 <option value="">Select System</option>
-<option>R2</option>
-<option>R2.5</option>
-<option>R10</option>
-<option>R50</option>
-<option>R400</option>
-<option>RX25</option>
-<option>RC30</option>
-<option>RX5</option>
-<option>RS15</option>
-<option>RA10</option>
+<option>R2</option><option>R2.5</option><option>R10</option><option>R50</option>
+<option>R400</option><option>RX25</option><option>RC30</option>
+<option>RX5</option><option>RS15</option><option>RA10</option>
 </select>
 
 <input type="date" id="onboarding">
+
+<div id="customRange" style="display:none">
+<input type="date" id="customStart">
+<input type="date" id="customEnd">
+</div>
 
 <div id="weeklyBox" style="display:none">
 <input type="date" id="weekStart">
@@ -118,7 +105,7 @@ h2 { font-size:28px;margin:0; }
 <button onclick="run('30')">30 Days</button>
 <button onclick="run('60')">60 Days</button>
 <button onclick="run('90')">90 Days</button>
-<button onclick="runDetailed()">Detailed Review</button>
+<button onclick="showDetailed()">Detailed Review</button>
 <button onclick="copyNote()">Copy GHL</button>
 <button onclick="copyEmail()">Copy Email</button>
 
@@ -131,47 +118,43 @@ h2 { font-size:28px;margin:0; }
 
 <script>
 
-let rows=[];
-let ghlText="";
-let lastStats={};
-
-const fmt = v => Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-
-function calcDaysInclusive(start,end){
-  const s=new Date(start); s.setHours(0,0,0,0);
-  const e=new Date(end); e.setHours(0,0,0,0);
-  return Math.floor((e-s)/(1000*60*60*24))+1;
+// ===== UI =====
+function hideAllDateSelectors(){
+weeklyBox.style.display="none";
+customRange.style.display="none";
 }
+function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
+function showDetailed(){ hideAllDateSelectors(); customRange.style.display="block"; runDetailed(); }
+function openGuide(){ window.open("guide.html","_blank"); }
 
-document.getElementById("fileInput").addEventListener("change",init);
-document.getElementById("onboarding").addEventListener("change",init);
+// ===== CORE =====
+let rows=[], ghlText="", lastStats={};
+const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+fileInput.onchange=init;
+onboarding.onchange=init;
 
 function init(){
-const file=document.getElementById("fileInput").files[0];
-const onboard=document.getElementById("onboarding").value;
+const file=fileInput.files[0], onboard=onboarding.value;
 if(!file||!onboard) return;
 
-const reader=new FileReader();
-reader.onload=e=>{
-rows=parseCSV(e.target.result);
-renderAccount();
-};
-reader.readAsText(file);
+const r=new FileReader();
+r.onload=e=>{ rows=parseCSV(e.target.result); renderAccount(); };
+r.readAsText(file);
 }
 
-function parseCSV(text){
-const lines=text.split("\n").filter(l=>l.trim());
-const headers=lines[1].split(",");
-return lines.slice(2).map(l=>{
-const v=l.split(",");
-let o={};
-headers.forEach((h,i)=>o[h.trim()]=v[i]?.trim());
+function parseCSV(t){
+const l=t.split("\n").filter(x=>x.trim());
+const h=l[1].split(",");
+return l.slice(2).map(x=>{
+const v=x.split(","), o={};
+h.forEach((k,i)=>o[k.trim()]=v[i]?.trim());
 return o;
 });
 }
 
-function sum(a){return a.reduce((s,v)=>s+v,0);}
-function get(c){return rows.filter(c).map(r=>Number(r["Net profit"])||0);}
+const sum=a=>a.reduce((s,v)=>s+v,0);
+const get=c=>rows.filter(c).map(r=>+r["Net profit"]||0);
 
 function getFirstClose(o){
 return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o)
@@ -179,179 +162,155 @@ return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o
 }
 
 function getBalanceAt(d){
-let dep=sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d));
-let wd=sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=d));
-let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
-return dep-wd+cl;
+return sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d))
+- sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=d))
++ sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 }
 
-// ✅ FIXED TOTAL CAPITAL
-function getTotalCapital(onboardingDate){
-
-let onboarding = new Date(onboardingDate);
-
-// balance on or before onboarding
-let baseBalance = getBalanceAt(onboarding);
-
-// deposits after onboarding
-let depositsAfter = sum(get(r =>
-r.Type==="Deposit" &&
-Number(r["Net profit"])>0 &&
-new Date(r["Close date"])>=onboarding
-));
-
-// withdrawals after onboarding
-let withdrawalsAfter = sum(get(r =>
-(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) &&
-new Date(r["Close date"])>=onboarding
-));
-
-return baseBalance + depositsAfter + withdrawalsAfter;
+function getTotalCapital(o){
+let d=new Date(o);
+return getBalanceAt(d)
++ sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=d))
++ sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=d));
 }
 
 // ===== ANALYSIS =====
-function analyzePeriod(start,end){
-let trades=rows.filter(r=>r.Type==="Closed position" &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end);
-
-let profits=trades.map(r=>Number(r["Net profit"])||0);
-let total=sum(profits);
-
+function analyze(start,end){
+let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
+let total=sum(trades.map(r=>+r["Net profit"]||0));
 let startBal=getBalanceAt(start);
-let endBal=getBalanceAt(end);
-let growth=startBal?(total/startBal)*100:0;
-
-return {trades,total,startBal,endBal,growth};
+return { total, startBal, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
 }
 
-// ===== ENGINE =====
-function processResult(start,end,title,type){
+// ===== NARRATIVES =====
+function narrative(start,end,type){
+let d=analyze(start,end);
 
-let d=analyzePeriod(start,end);
-let duration=calcDaysInclusive(start,end);
+if(type==="30"){
+return `<div class="data-item">
+The account recorded a growth of ${d.growth.toFixed(2)}% over 30 days, generating $${fmt(d.total)} in closed profit.
+Performance reflects early execution and remains dependent on market conditions.
+</div>`;
+}
 
-let html=`
-<div class="section-title">${title}</div>
+if(type==="60"){
+let mid=new Date(start); mid.setDate(mid.getDate()+29);
+let a=analyze(start,mid), b=analyze(mid,end);
+return `<div class="data-item">
+The account recorded a growth of ${d.growth.toFixed(2)}% over 60 days, generating $${fmt(d.total)} in closed profit.
 
+The first 30 days produced $${fmt(a.total)}, while the next 30 days produced $${fmt(b.total)}, showing how performance evolved.
+
+Performance remains dependent on market conditions.
+</div>`;
+}
+
+if(type==="90"){
+return `<div class="data-item">
+The account recorded a growth of ${d.growth.toFixed(2)}% over 90 days, generating $${fmt(d.total)} in closed profit.
+
+This reflects broader system behavior across different market conditions.
+
+Performance remains dependent on market conditions.
+</div>`;
+}
+}
+
+// ===== DETAILED =====
+function detailedNarrative(start,end){
+let d=analyze(start,end);
+let balances=[];
+
+rows.forEach(r=>{
+if(r.Type==="Closed position"){
+let dt=new Date(r["Close date"]);
+if(dt>=start&&dt<=end) balances.push({dt,b:getBalanceAt(dt)});
+}
+});
+
+if(!balances.length) return "";
+
+let init=balances[0].b;
+let low=Math.min(...balances.map(x=>x.b));
+let lowObj=balances.find(x=>x.b===low);
+let final=balances.at(-1).b;
+
+return `<div class="data-item">
+The account started at $${fmt(init)} on ${balances[0].dt.toLocaleDateString()}.
+
+It dropped to $${fmt(low)} on ${lowObj.dt.toLocaleDateString()} (${((low-init)/init*100).toFixed(2)}%).
+
+${low<init?"The account went below initial capital.":"The account stayed above initial capital."}
+
+${final>init?`Recovered to $${fmt(final)} (${((final-init)/init*100).toFixed(2)}%).`:`Currently at $${fmt(final)}.`}
+
+Total closed profit: $${fmt(d.total)}.
+</div>`;
+}
+
+// ===== RUN =====
+function run(type){
+let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
+let s=new Date(f["Close date"]), e=new Date(s); e.setDate(e.getDate()+(+type-1));
+render(s,e,type+" Days",type);
+}
+
+function runWeekly(){
+render(new Date(weekStart.value),new Date(weekEnd.value),"Weekly");
+}
+
+function runDetailed(){
+let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
+let s=customStart.value?new Date(customStart.value):new Date(f["Close date"]);
+let e=customEnd.value?new Date(customEnd.value):new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+render(s,e,"Detailed Review","detailed");
+}
+
+// ===== RENDER =====
+function render(start,end,title,type){
+let d=analyze(start,end);
+let html=`<div class="section-title">${title}</div>
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(d.endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(d.total)}</div>
 <div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${duration} days</div>
-</div>
-`;
+</div>`;
 
-document.getElementById("breakdown").innerHTML=html;
-
-let system=document.getElementById("software").value||"N/A";
-
-ghlText=`System: ${system}
-${title}
-Balance: $${fmt(d.endBal)}
-Closed Profit: $${fmt(d.total)}
-Growth: ${d.growth.toFixed(2)}%
-Track Record: ${duration} days`;
-
-lastStats={title,...d,duration,system};
+if(["30","60","90"].includes(type)){
+html+=`<div class="section-title">Performance Summary</div>${narrative(start,end,type)}`;
+}
+if(type==="detailed"){
+html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
 }
 
-// ===== BUTTONS =====
-function run(type){
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let start=new Date(first["Close date"]);
-let end=new Date(start);
-end.setDate(end.getDate()+(Number(type)-1));
-
-processResult(start,end,type+" Days",type);
-}
-
-function runWeekly(){
-let start=new Date(document.getElementById("weekStart").value);
-let end=new Date(document.getElementById("weekEnd").value);
-processResult(start,end,"Weekly","weekly");
-}
-
-function runDetailed(){
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-processResult(new Date(first["Close date"]), new Date(), "Detailed Review","detailed");
-}
-
-function showWeekly(){
-document.getElementById("weeklyBox").style.display="block";
-}
-
-function openGuide(){
-window.open("guide.html","_blank");
-}
-
-// ===== COPY =====
-function copyNote(){
-if(!ghlText) return alert("Run report first");
-navigator.clipboard.writeText(ghlText);
-alert("Copied");
-}
-
-function copyEmail(){
-if(!lastStats.title) return alert("Run report first");
-
-let email=`Hi,
-
-Here is your ${lastStats.title} performance update for ${lastStats.system}.
-
-The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
-
-Performance remains dependent on market conditions.
-
-Best regards`;
-
-navigator.clipboard.writeText(email);
-alert("Copied");
+breakdown.innerHTML=html;
+ghlText=html.replace(/<[^>]*>/g,'');
 }
 
 // ===== OVERVIEW =====
 function renderAccount(){
+let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
 
-const onboard=document.getElementById("onboarding").value;
-const first=getFirstClose(new Date(onboard));
-if(!first) return;
+let fc=new Date(f["Close date"]);
+let last=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 
-let system=document.getElementById("software").value||"N/A";
-
-let firstClose=new Date(first["Close date"]);
-let lastActivity=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-
-let duration=calcDaysInclusive(firstClose,lastActivity);
-
-let endBal=getBalanceAt(lastActivity);
 let closed=sum(get(r=>r.Type==="Closed position"));
-let startBal=getBalanceAt(firstClose);
+let startBal=getBalanceAt(fc);
 let growth=startBal?(closed/startBal)*100:0;
 
-// ✅ RESTORED TOTAL CAPITAL
-let totalCapital=getTotalCapital(onboard);
-
-document.getElementById("overview").innerHTML=`
+overview.innerHTML=`
 <div class="section-title">Overview</div>
-
 <div class="data-grid">
-<div class="data-item">System<br><h2>${system}</h2></div>
-<div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
+<div class="data-item">Balance<br><h2>$${fmt(getBalanceAt(last))}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br><h2>$${fmt(closed)}</h2></div>
-<div class="data-item">Total Capital<br>$${fmt(totalCapital)}</div>
-<div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
-<div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
-<div class="data-item">Track Record<br>${duration} days</div>
-</div>
-`;
+<div class="data-item">Total Capital<br><h2>$${fmt(getTotalCapital(onboarding.value))}</h2></div>
+</div>`;
 }
+
+// ===== COPY =====
+function copyNote(){ navigator.clipboard.writeText(ghlText); alert("Copied"); }
+function copyEmail(){ navigator.clipboard.writeText(ghlText); alert("Copied"); }
 
 </script>
 
