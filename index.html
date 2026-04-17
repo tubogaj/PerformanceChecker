@@ -132,23 +132,33 @@ let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 return dep-wd+cl;
 }
 
-// ===== TOTAL CAPITAL =====
-function getTotalCapital(firstClose){
-let startingBalance = getBalanceAt(firstClose);
+// ===== FIXED TOTAL CAPITAL =====
+function getTotalCapital(onboardingDate){
 
-let deposits = sum(get(r=>r.Type==="Deposit"));
-let withdrawals = sum(get(r=>r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)));
+let onboarding = new Date(onboardingDate);
 
-return startingBalance + deposits + withdrawals;
+// balance BEFORE or AT onboarding
+let baseBalance = getBalanceAt(onboarding);
+
+// deposits AFTER onboarding
+let depositsAfter = sum(get(r =>
+r.Type==="Deposit" &&
+Number(r["Net profit"])>0 &&
+new Date(r["Close date"])>=onboarding
+));
+
+// withdrawals AFTER onboarding
+let withdrawalsAfter = sum(get(r =>
+(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) &&
+new Date(r["Close date"])>=onboarding
+));
+
+return baseBalance + depositsAfter + withdrawalsAfter;
 }
 
-function getDepositsWithdrawals(start,end){
-let deposits=sum(get(r=>r.Type==="Deposit" && Number(r["Net profit"])>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-let withdrawals=sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-return {deposits, withdrawals};
-}
-
+// ===== PURE TRADING GROWTH =====
 function analyzePeriod(start,end){
+
 let trades=rows.filter(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
 new Date(r["Close date"])<=end);
@@ -156,193 +166,19 @@ new Date(r["Close date"])<=end);
 let profits=trades.map(r=>Number(r["Net profit"])||0);
 let total=sum(profits);
 
-let dep=getDepositsWithdrawals(start,end);
-
 let startBal=getBalanceAt(start);
 let endBal=getBalanceAt(end);
-let growth=startBal?(total/startBal)*100:0;
 
-return {trades,total,startBal,endBal,growth,deposits:dep.deposits,withdrawals:dep.withdrawals};
-}
+let growth = startBal ? (total/startBal)*100 : 0;
 
-// ===== SYSTEM =====
-function systemNarrative(system){
-if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
-if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
-if(["R10","R50","R400"].includes(system)) return "This reflects a diversified AI allocation model adapting across multiple strategies.";
-if(system==="RX25") return "This reflects adaptive exposure across forex and gold based on volatility.";
-if(system==="RX5") return "This reflects a conservative allocation approach focused on stability.";
-if(system==="RC30") return "This reflects high-volatility crypto market behavior.";
-if(system==="RS15") return "This reflects event-driven trading with selective participation.";
-if(system==="RA10") return "This reflects reversal-based execution focused on turning points.";
-return "";
-}
-
-// ===== NARRATIVE =====
-function generateNarrative(start,end,type){
-
-let d=analyzePeriod(start,end);
-let system=document.getElementById("software").value;
-
-let capitalFlow = "";
-if(d.deposits>0) capitalFlow += `A deposit of $${fmt(d.deposits)} was made during this period. `;
-if(Math.abs(d.withdrawals)>0) capitalFlow += `A withdrawal of $${fmt(Math.abs(d.withdrawals))} occurred during this period.`;
-
-if(type==="60"){
-let mid=new Date(start); mid.setDate(mid.getDate()+29);
-let first30=analyzePeriod(start,mid);
-let next30=analyzePeriod(mid,end);
-
-return `<div class="data-item">
-
-The account recorded a growth of ${d.growth.toFixed(2)}% over the 60-day period.
-
-The balance movement during this timeframe reflects both trading activity and capital adjustments. ${capitalFlow}
-
-The system generated a total closed profit of $${fmt(d.total)} over the period.
-
-During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}, providing a clear comparison of how performance evolved.
-
-${systemNarrative(system)}
-
-Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
-
-</div>`;
-}
-
-if(type==="90"){
-return `<div class="data-item">
-
-The account recorded a growth of ${d.growth.toFixed(2)}% over the 90-day period.
-
-The balance movement during this timeframe reflects both trading performance and any capital adjustments made. ${capitalFlow}
-
-The system generated a total closed profit of $${fmt(d.total)} across the period.
-
-${systemNarrative(system)}
-
-This longer duration provides a clearer view of how the system behaves across different market conditions, including periods of volatility, stability, and recovery.
-
-Performance remains dependent on market conditions, and variability should still be expected moving forward.
-
-</div>`;
-}
-
-if(type==="30"){
-return `<div class="data-item">
-
-The account recorded a growth of ${d.growth.toFixed(2)}% over the first 30 days.
-
-The balance movement reflects early-stage execution along with any capital adjustments. ${capitalFlow}
-
-The system generated a closed profit of $${fmt(d.total)} during this period.
-
-${systemNarrative(system)}
-
-Performance remains dependent on market conditions, and early fluctuations are part of normal system behavior.
-
-</div>`;
-}
-
-}
-
-// ===== ENGINE =====
-function processResult(start,end,title,type){
-
-let d=analyzePeriod(start,end);
-let duration=calcDaysInclusive(start,end);
-
-let html=`
-<div class="section-title">${title}</div>
-
-<div class="data-grid">
-<div class="data-item">Balance: $${fmt(d.endBal)}</div>
-<div class="data-item">Closed Profit: $${fmt(d.total)}</div>
-<div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${duration} days</div>
-</div>
-`;
-
-if(type==="30"||type==="60"||type==="90"){
-html+=`<div style="margin-top:20px"></div>
-<div class="section-title">Performance Summary</div>
-${generateNarrative(start,end,type)}`;
-}
-
-document.getElementById("breakdown").innerHTML=html;
-
-let system=document.getElementById("software").value||"N/A";
-
-ghlText=`System: ${system}
-${title}
-Balance: $${fmt(d.endBal)}
-Closed Profit: $${fmt(d.total)}
-Growth: ${d.growth.toFixed(2)}%
-Track Record: ${duration} days`;
-
-lastStats={title,...d,duration,system};
-}
-
-// ===== BUTTONS =====
-function run(type){
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-let start=new Date(first["Close date"]);
-let end=new Date(start);
-end.setDate(end.getDate()+(Number(type)-1));
-
-processResult(start,end,type+" Days",type);
-}
-
-function runWeekly(){
-let start=new Date(document.getElementById("weekStart").value);
-let end=new Date(document.getElementById("weekEnd").value);
-processResult(start,end,"Weekly","weekly");
-}
-
-function runDetailed(){
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
-if(!first) return;
-
-processResult(new Date(first["Close date"]), new Date(), "Detailed Review","detailed");
-}
-
-function showWeekly(){
-document.getElementById("weeklyBox").style.display="block";
-}
-
-// ===== COPY =====
-function copyNote(){
-if(!ghlText) return alert("Run report first");
-navigator.clipboard.writeText(ghlText);
-alert("Copied");
-}
-
-function copyEmail(){
-if(!lastStats.title) return alert("Run report first");
-
-let email=`Hi,
-
-Here is your ${lastStats.title} performance update for ${lastStats.system}.
-
-The account is currently at $${fmt(lastStats.endBal)}, with a closed result of $${fmt(lastStats.total)}, reflecting ${lastStats.growth.toFixed(2)}% over ${lastStats.duration} days.
-
-Performance remains dependent on market conditions.
-
-Best regards`;
-
-navigator.clipboard.writeText(email);
-alert("Copied");
+return {trades,total,startBal,endBal,growth};
 }
 
 // ===== OVERVIEW =====
 function renderAccount(){
 
-const onboard=new Date(document.getElementById("onboarding").value);
-const first=getFirstClose(onboard);
+const onboard=document.getElementById("onboarding").value;
+const first=getFirstClose(new Date(onboard));
 if(!first) return;
 
 let system=document.getElementById("software").value||"N/A";
@@ -355,9 +191,11 @@ let duration=calcDaysInclusive(firstClose,lastActivity);
 let endBal=getBalanceAt(lastActivity);
 let closed=sum(get(r=>r.Type==="Closed position"));
 let startBal=getBalanceAt(firstClose);
+
 let growth=startBal?(closed/startBal)*100:0;
 
-let totalCapital=getTotalCapital(firstClose);
+// 🔥 FIXED TOTAL CAPITAL
+let totalCapital=getTotalCapital(onboard);
 
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
@@ -366,14 +204,14 @@ document.getElementById("overview").innerHTML=`
 <div class="data-item">System<br><h2>${system}</h2></div>
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
-<div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
+<div class="data-item">Closed Profit<br><h2>$${fmt(closed)}</h2></div>
 <div class="data-item">Total Capital<br>$${fmt(totalCapital)}</div>
 <div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
 <div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
 </div>
 
-<div class="note">Total Capital = starting balance + deposits - withdrawals</div>
+<div class="note">Total Capital = balance at onboarding + deposits after onboarding - withdrawals after onboarding</div>
 `;
 }
 
