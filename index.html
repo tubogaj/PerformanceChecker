@@ -322,31 +322,27 @@ software.onchange=renderAccount;
 
 function init(){
 
-const file = fileInput.files[0];
-const onboard = onboarding.value;
+  const file = fileInput.files[0];
+  const onboard = onboarding.value;
 
-if(!file){
-  alert("Upload CSV first");
-  return;
-}
+  if(!file){
+    alert("Upload CSV first");
+    return;
+  }
 
-if(!onboard){
-  alert("Select onboarding date");
-  return;
-}
+  if(!onboard){
+    alert("Select onboarding date");
+    return;
+  }
 
-const r=new FileReader();
-r.onload=e=>{
-  rows=parseCSV(e.target.result);
-  renderAccount();
-};
+  const reader = new FileReader();
 
-r.readAsText(file);
-}
-  
-const r=new FileReader();
-r.onload=e=>{ rows=parseCSV(e.target.result); renderAccount(); };
-r.readAsText(file);
+  reader.onload = function(e){
+    rows = parseCSV(e.target.result);
+    renderAccount();
+  };
+
+  reader.readAsText(file);
 }
 
 function parseCSV(t){
