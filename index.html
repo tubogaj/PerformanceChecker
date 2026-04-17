@@ -191,7 +191,6 @@ button:hover { background:#333; }
 <div id="weeklyBox" style="display:none">
   <input type="date" id="weekStart">
   <input type="date" id="weekEnd">
-  <button onclick="runWeekly()">Run Weekly</button>
 </div>
 
 <!-- NEW CUSTOM BOX -->
@@ -210,7 +209,6 @@ button:hover { background:#333; }
 <button onclick="showDetailed()">Detailed Review</button>
 <button onclick="showCustom()">Custom</button>
 <button onclick="copyNote()">Copy to GHL</button>
-<button onclick="copyEmail()">Copy to Email</button>
 
 </div>
 
@@ -295,6 +293,14 @@ function runCustom(){
 function runWeekly(){
   if(!weekStart.value || !weekEnd.value) return alert("Select dates");
   render(new Date(weekStart.value), new Date(weekEnd.value), "Weekly Review","weekly");
+}
+  weekStart.onchange = autoWeekly;
+weekEnd.onchange = autoWeekly;
+
+function autoWeekly(){
+  if(weekStart.value && weekEnd.value){
+    runWeekly();
+  }
 }
 
 let rows=[], ghlText="";
@@ -863,8 +869,8 @@ if(type==="weekly"){
   <br>
   <div class="data-grid-4">
     <div class="data-item">Track Record<br><h3>${track} days</h3></div>
-    <div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
-    <div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
+    <div class="data-item"></div>
+    <div class="data-item"></div>
     <div class="data-item"></div>
   </div>
   `;
@@ -888,8 +894,12 @@ let first=getFirstClose(new Date(onboarding.value));
 if(!first) return;
 
 let last=getLastActivity();
-let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
+let overviewFirst = getFirstClose(new Date(onboarding.value));
+let overviewLast = getLastActivity();
 
+let track = Math.floor((overviewLast - new Date(overviewFirst["Close date"])) / (1000*60*60*24)) + 1;
+
+  
 // ✅ FIX: define d properly using full range
 let start = new Date(first["Close date"]);
 let end = last;
@@ -951,21 +961,7 @@ function copyNote(){
   alert("Copied clean for GHL");
 }
 
-  function copyEmail(){
 
-  let content = document.getElementById("breakdown").innerHTML;
-
-  // CLEAN EMAIL FORMAT
-  let formatted = content
-    .replace(/<div class="section-title">/g,"<h3>")
-    .replace(/<\/div>/g,"</h3>")
-    .replace(/<div class="data-item">/g,"<p>")
-    .replace(/<\/div>/g,"</p>")
-    .replace(/<br>/g,"<br>");
-
-  navigator.clipboard.writeText(formatted);
-  alert("Copied for Email");
-}
   
 </script>
 
