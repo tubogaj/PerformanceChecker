@@ -848,7 +848,7 @@ let first=getFirstClose(new Date(onboarding.value));
 let last=getLastActivity();
 let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
   
-let html=`
+let html = `
 <div class="data-grid-5">
 <div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
 <div class="data-item">Balance<br><h3>$${fmt(d.endBal)}</h3></div>
@@ -856,27 +856,26 @@ let html=`
 <div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
 <div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
 </div>
+`;
 
-${type==="weekly" ? `
-<br>
-<div class="data-grid-4">
-  <div class="data-item">Track Record<br><h3>${track} days</h3></div>
-  <div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
-  <div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
-  <div class="data-item"></div>
-</div>
-` : ""}
+if(type==="weekly"){
+  html += `
+  <br>
+  <div class="data-grid-4">
+    <div class="data-item">Track Record<br><h3>${track} days</h3></div>
+    <div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
+    <div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
+    <div class="data-item"></div>
+  </div>
+  `;
+}
 
 if(type!=="detailed" && type!=="weekly"){
-  html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
+  html += `<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
 }
 
 if(type==="detailed"){
-html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
-}
-
-breakdown.innerHTML=html;
-ghlText=html.replace(/<[^>]*>/g,'');
+  html += `<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
 }
 
 // ===== OVERVIEW =====
