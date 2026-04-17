@@ -310,6 +310,7 @@ const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximum
 
 fileInput.onchange=init;
 onboarding.onchange=init;
+software.onchange=renderAccount;
 
 function init(){
 const file=fileInput.files[0], onboard=onboarding.value;
@@ -844,8 +845,15 @@ ghlText=html.replace(/<[^>]*>/g,'');
 function renderAccount(){
 
 let first=getFirstClose(new Date(onboarding.value));
+if(!first) return;
+
 let last=getLastActivity();
 let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
+
+// ✅ FIX: define d properly using full range
+let start = new Date(first["Close date"]);
+let end = last;
+let d = analyze(start,end);
 
 overview.innerHTML=`
 <div class="section-title">Account Overview</div>
@@ -856,7 +864,6 @@ overview.innerHTML=`
 <div class="data-item">Closed Profit<br><h3>$${fmt(d.total)}</h3></div>
 <div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
 <div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
-
 </div>
 
 <br>
@@ -874,39 +881,52 @@ overview.innerHTML=`
 function copyNote(){
 
   let title = document.querySelector("#breakdown .section-title")?.innerText || "";
-  let output = "";
 
-  // ===== GET DATA GRID VALUES CLEANLY =====
+  // ===== GET DATA GRID CLEAN =====
   let items = document.querySelectorAll("#breakdown .data-grid-5 .data-item");
 
   let cleanData = [];
 
   items.forEach(item => {
     let lines = item.innerText.split("\n").map(x => x.trim()).filter(Boolean);
-
     if(lines.length >= 2){
       cleanData.push(`${lines[0]}: ${lines[1]}`);
     }
   });
 
-  // ===== WEEKLY = DATA ONLY =====
-  if(title.toLowerCase().includes("weekly")){
-    output = cleanData.join("\n");
-  }
+  // ===== GET FULL TEXT CLEAN =====
+  let fullText = document.getElementById("breakdown").innerText
+    .replace(/\n{3,}/g,"\n\n")
+    .replace(/[ \t]+/g," ")
+    .trim();
 
-  // ===== CUSTOM + OTHERS = FULL =====
-  else{
-    let fullText = document.getElementById("breakdown").innerText
-      .replace(/\n{3,}/g,"\n\n")
-      .trim();
-
-    output = cleanData.join("\n") + "\n\n" + fullText;
-  }
+  // ✅ FINAL OUTPUT (UNIFIED FOR ALL TYPES)
+  let output =
+    `${title}\n\n` +
+    cleanData.join("\n") +
+    "\n\n" +
+    fullText;
 
   navigator.clipboard.writeText(output);
   alert("Copied clean for GHL");
 }
 
+  function copyEmail(){
+
+  let content = document.getElementById("breakdown").innerHTML;
+
+  // CLEAN EMAIL FORMAT
+  let formatted = content
+    .replace(/<div class="section-title">/g,"<h3>")
+    .replace(/<\/div>/g,"</h3>")
+    .replace(/<div class="data-item">/g,"<p>")
+    .replace(/<\/div>/g,"</p>")
+    .replace(/<br>/g,"<br>");
+
+  navigator.clipboard.writeText(formatted);
+  alert("Copied for Email");
+}
+  
 </script>
 
 </body>
