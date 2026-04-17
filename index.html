@@ -45,6 +45,55 @@ button:hover { background:#333; }
   grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
   gap:12px;
 }
+  /* ===== GUIDE MODAL ===== */
+.guide-modal {
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+
+.guide-box {
+  width:900px;
+  height:600px;
+  background:#fff;
+  border-radius:16px;
+  display:flex;
+  overflow:hidden;
+}
+
+.guide-menu {
+  width:220px;
+  background:#111;
+  color:#fff;
+  padding:20px;
+}
+
+.guide-menu div {
+  padding:12px;
+  cursor:pointer;
+  border-radius:8px;
+}
+.guide-menu div:hover { background:#333; }
+
+.guide-content {
+  flex:1;
+  padding:25px;
+  overflow:auto;
+}
+
+.close-btn {
+  position:absolute;
+  top:20px;
+  right:30px;
+  font-size:20px;
+  cursor:pointer;
+  color:#fff;
+}
 
 .data-item {
   background:#fff;
@@ -81,7 +130,7 @@ h2 { font-size:28px;margin:0; }
   <button onclick="openGuide()">Guide / Library</button>
 </div>
 
-<select id="software">
+<select id="software" onchange="updateSystemGuide()">
 <option value="">Select System</option>
 <option>R2</option><option>R2.5</option><option>R10</option><option>R50</option>
 <option>R400</option><option>RX25</option><option>RC30</option>
@@ -112,16 +161,85 @@ h2 { font-size:28px;margin:0; }
 
 </div>
 
+  <!-- ===== GUIDE MODAL ===== -->
+<div id="guideModal" class="guide-modal">
+<div class="close-btn" onclick="closeGuide()">✕</div>
+
+<div class="guide-box">
+  
+  <div class="guide-menu">
+    <div onclick="loadGuide('how')">How To?</div>
+    <div onclick="loadGuide('desc')">Descriptions</div>
+    <div onclick="loadGuide('calc')">Calculations</div>
+  </div>
+
+  <div class="guide-content">
+    
+    <!-- 🔍 SEARCH BAR -->
+    <input type="text" id="guideSearch" placeholder="Search..." onkeyup="searchGuide()" style="width:100%;margin-bottom:15px;padding:10px;border-radius:8px;border:1px solid #ddd;">
+    
+    <div id="guideContent">Select a category</div>
+
+  </div>
+
+</div>
+</div>
+  
 <script>
 
 // ===== UI =====
+// ===== GUIDE CONTENT =====
+let guideData = {
+  how: `
+  <h3>How To Use</h3>
+  <p>Upload CSV → Select onboarding → Choose timeframe → Copy output</p>
+  `,
+
+  desc: `
+  <h3>Descriptions</h3>
+  <p><b>Growth:</b> Based purely on trading performance.</p>
+  <p><b>Total Capital:</b> Reflects deposits & withdrawals.</p>
+  <p><b>Balance:</b> Real-time account value.</p>
+  `,
+
+  calc: `
+  <h3>Calculations</h3>
+  <p>Growth = Profit ÷ Starting Balance</p>
+  <p>Total Capital = Deposits − Withdrawals</p>
+  `
+};
+
+function loadGuide(type){
+  guideContent.innerHTML = guideData[type];
+}
+
+// 🔍 SEARCH FUNCTION
+function searchGuide(){
+  let input = document.getElementById("guideSearch").value.toLowerCase();
+  let text = guideContent.innerText.toLowerCase();
+
+  if(!input) return;
+
+  if(text.includes(input)){
+    guideContent.style.background="#fff";
+  } else {
+    guideContent.style.background="#ffe6e6";
+  }
+}
+  
 function hideAllDateSelectors(){
 weeklyBox.style.display="none";
 customRange.style.display="none";
 }
 function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
 function showDetailed(){ hideAllDateSelectors(); customRange.style.display="block"; runDetailed(); }
-function openGuide(){ window.open("guide.html","_blank"); }
+function openGuide(){
+  document.getElementById("guideModal").style.display="flex";
+  loadGuide('how');
+}
+function closeGuide(){
+  document.getElementById("guideModal").style.display="none";
+}
 
 // ===== CORE =====
 let rows=[], ghlText="";
@@ -182,6 +300,20 @@ return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0
 }
 
 // ===== SYSTEM =====
+function updateSystemGuide(){
+  let system = document.getElementById("software").value;
+  if(!system) return;
+
+  guideData.desc = `
+  <h3>System Description (${system})</h3>
+  <p>${systemNarrative(system)}</p>
+
+  <h3>Metrics</h3>
+  <p><b>Growth:</b> Based purely on trading performance.</p>
+  <p><b>Total Capital:</b> Reflects deposits & withdrawals.</p>
+  `;
+}
+  
 function systemNarrative(system){
 if(system==="R2") return "This reflects grid-based execution where positions are layered, and recovery is driven by price retracement.";
 if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
