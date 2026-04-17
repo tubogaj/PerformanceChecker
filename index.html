@@ -269,7 +269,14 @@ function hideAllDateSelectors(){
   document.getElementById("weeklyBox").style.display="none";
   document.getElementById("customBox").style.display="none";
 }
-function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
+function showWeekly(){
+  hideAllDateSelectors();
+  weeklyBox.style.display="block";
+
+  if(weekStart.value && weekEnd.value){
+    runWeekly();
+  }
+}
 function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
 function showCustom(){
   hideAllDateSelectors();
@@ -334,8 +341,12 @@ const sum=a=>a.reduce((s,v)=>s+v,0);
 const get=c=>rows.filter(c).map(r=>+r["Net profit"]||0);
 
 function getFirstClose(o){
-return rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=o)
-.sort((a,b)=>new Date(a["Close date"])-new Date(b["Close date"]))[0];
+return rows
+  .filter(r => 
+    (r.Type || "").toLowerCase().includes("closed") &&
+    new Date(r["Close date"]) >= o
+  )
+  .sort((a,b)=>new Date(a["Close date"]) - new Date(b["Close date"]))[0];
 }
 
 function getLastActivity(){
@@ -343,13 +354,13 @@ return new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
 }
 
 function getBalanceAt(d){
-return sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d))
-- sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=d))
-+ sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
+return sum(get(r=>(r.Type || "").toLowerCase().includes("deposit") && new Date(r["Close date"])<=d))
+- sum(get(r=>(r.Type || "").toLowerCase().includes("withdraw") && new Date(r["Close date"])<=d))
++ sum(get(r=>(r.Type || "").toLowerCase().includes("closed") && new Date(r["Close date"])<=d));
 }
 
 function getFloatingPL(){
-return sum(rows.filter(r=>r.Type==="Open position").map(r=>+r["Net profit"]||0));
+return sum(rows.filter(r=>(r.Type || "").toLowerCase().includes("open")).map(r=>+r["Net profit"]||0));
 }
 
 function getTotalCapital(onboardDate){
@@ -358,24 +369,24 @@ let o = new Date(onboardDate);
 
 // ✅ 1. BALANCE BEFORE OR ON ONBOARDING
 let startingBalance =
-  sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=o))
-- sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=o))
-+ sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=o));
+  sum(get(r=>(r.Type || "").toLowerCase().includes("deposit") && new Date(r["Close date"])<=o))
+- sum(get(r=>(r.Type || "").toLowerCase().includes("withdraw") && new Date(r["Close date"])<=o))
++ sum(get(r=>(r.Type || "").toLowerCase().includes("closed") && new Date(r["Close date"])<=o));
 
 // ✅ 2. DEPOSITS AFTER ONBOARDING
 let depositsAfter =
-  sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>o));
+  sum(get(r=>(r.Type || "").toLowerCase().includes("deposit") && +r["Net profit"]>0 && new Date(r["Close date"])>o));
 
 // ✅ 3. WITHDRAWALS AFTER ONBOARDING
 let withdrawalsAfter =
-  sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>o));
+  sum(get(r=>((r.Type || "").toLowerCase().includes("withdraw") || ((r.Type || "").toLowerCase().includes("deposit") && +r["Net profit"]<0)) && new Date(r["Close date"])>o));
 
 // ✅ FINAL
 return startingBalance + depositsAfter - Math.abs(withdrawalsAfter);
 }
 
 function analyze(start,end){
-let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
+let trades=rows.filter(r=>(r.Type || "").toLowerCase().includes("closed") && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
 let total=sum(trades.map(r=>+r["Net profit"]||0));
 let startBal=getBalanceAt(start);
 return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
@@ -622,7 +633,7 @@ let endBal = getBalanceAt(end);
 
 // TOTAL TRADES (PERIOD ONLY)
 let trades = rows.filter(r =>
-  r.Type==="Closed position" &&
+  (r.Type || "").toLowerCase().includes("closed") &&
   new Date(r["Close date"])>=start &&
   new Date(r["Close date"])<=end
 ).length;
@@ -729,7 +740,7 @@ let d = analyze(start,end);
 
 let balances=[];
 rows.forEach(r=>{
-  if(r.Type==="Closed position"){
+  if((r.Type || "").toLowerCase().includes("closed")){
     let dt=new Date(r["Close date"]);
     if(dt>=start && dt<=end){
       balances.push({dt,b:getBalanceAt(dt)});
@@ -749,8 +760,8 @@ let finalBal = balances[balances.length-1].b;
 let lastDate = balances[balances.length-1].dt;
 
 // deposits & withdrawals
-let deposits = sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
-let withdrawals = sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let deposits = sum(get(r=>(r.Type || "").toLowerCase().includes("deposit") && +r["Net profit"]>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let withdrawals = sum(get(r=>((r.Type || "").toLowerCase().includes("withdraw") || ((r.Type || "").toLowerCase().includes("deposit") && +r["Net profit"]<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
 
 let ddPct = ((lowest-initial)/initial)*100;
 let growthPct = ((finalBal-initial)/initial)*100;
