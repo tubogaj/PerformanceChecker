@@ -227,8 +227,11 @@ weeklyBox.style.display="none";
 customRange.style.display="none";
 }
 function showWeekly(){ hideAllDateSelectors(); weeklyBox.style.display="block"; }
-function showDetailed(){ hideAllDateSelectors(); runDetailed(); }
-function openGuide(){
+function showDetailed(){
+  hideAllDateSelectors();
+  runDetailed();
+}
+  function openGuide(){
   document.getElementById("guideModal").style.display="flex";
   loadGuide('how');
 }
@@ -237,6 +240,15 @@ function closeGuide(){
 }
 
 // ===== CORE =====
+  
+// ===== FLOATING P/L =====
+function getFloatingPL(){
+  return sum(
+    rows
+      .filter(r => r.Type === "Open position")
+      .map(r => +r["Net profit"] || 0)
+  );
+}
 let rows=[], ghlText="";
 const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -379,18 +391,16 @@ Performance remains dependent on market conditions, and early fluctuations are p
 }
 }
 
-// ===== DETAILED STORY =====
+// ===== DETAILED NARRATIVE (UPDATED) =====
 function detailedNarrative(start,end){
 
 let d=analyze(start,end);
-let system=document.getElementById("software").value;
-let positive=d.total>=0;
 
 let balances=[];
 rows.forEach(r=>{
 if(r.Type==="Closed position"){
 let dt=new Date(r["Close date"]);
-if(dt>=start&&dt<=end){
+if(dt>=start && dt<=end){
 balances.push({dt,b:getBalanceAt(dt)});
 }
 }
@@ -398,21 +408,38 @@ balances.push({dt,b:getBalanceAt(dt)});
 
 if(!balances.length) return "";
 
-let init=balances[0].b;
-let low=Math.min(...balances.map(x=>x.b));
-let lowObj=balances.find(x=>x.b===low);
-let final=balances.at(-1).b;
+let initial=balances[0].b;
+let initialDate=balances[0].dt;
+
+let lowest=Math.min(...balances.map(x=>x.b));
+let lowestObj=balances.find(x=>x.b===lowest);
+
+let finalBal=balances[balances.length-1].b;
+
+let belowInitial = lowest < initial;
+let recovered = finalBal > initial;
+
+let ddPct = ((lowest-initial)/initial)*100;
+let recPct = ((finalBal-initial)/initial)*100;
 
 return `<div class="data-item">
-The account started at $${fmt(init)} on ${balances[0].dt.toLocaleDateString()} and progressed through varying market conditions.
-At its lowest point, the balance reached $${fmt(low)} on ${lowObj.dt.toLocaleDateString()}, reflecting how the system responded during periods of unfavorable market movement.
-${final>init
-? `Following this phase, the account demonstrated recovery, reaching $${fmt(final)}, showing the system's ability to adapt and stabilize as conditions improved.`
-: `The account is currently at $${fmt(final)}, reflecting an ongoing drawdown phase where the system continues to manage exposure carefully.`}
-${systemNarrative(system)}
-${!positive ? "The master account applies equity protection mechanisms, ensuring positions are managed carefully, and exposure is reduced during unfavorable market conditions. This allows the system to slow down and avoid excessive risk while waiting for better opportunities." : ""}
-Overall, the system generated $${fmt(d.total)} in closed profit over this period.
+
+The account started at $${fmt(initial)} on ${initialDate.toLocaleDateString()}.
+
+During the selected period, the account reached a low of $${fmt(lowest)} on ${lowestObj.dt.toLocaleDateString()}, representing ${ddPct.toFixed(2)}%.
+
+${belowInitial
+? "The account did go below the initial capital during this period."
+: "The account remained above the initial capital throughout the period."}
+
+${recovered
+? `The account recovered and is currently above the initial level, now at $${fmt(finalBal)}, representing ${recPct.toFixed(2)}% growth.`
+: `The account has not fully recovered to the initial level and is currently at $${fmt(finalBal)}.`}
+
+The system generated a total closed profit of $${fmt(d.total)} during this timeframe.
+
 Performance remains dependent on market conditions, and fluctuations, including drawdown and recovery, are part of normal system behavior.
+
 </div>`;
 }
 
@@ -425,8 +452,10 @@ render(s,e,type+" Days",type);
 
 function runDetailed(){
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
+
 let s = new Date(f["Close date"]);
 let e = new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
+
 render(s,e,"Detailed Review","detailed");
 }
 
@@ -446,6 +475,7 @@ let html=`
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(d.endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(d.total)}</div>
+<div class="data-item">Floating P/L: $${fmt(getFloatingPL())}</div>
 <div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
 <div class="data-item">Track Record: ${track} days</div>
 </div>
@@ -483,6 +513,7 @@ overview.innerHTML=`
 <div class="data-item">Balance<br><h2>$${fmt(getBalanceAt(last))}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br><h2>$${fmt(closed)}</h2></div>
+<div class="data-item">Floating P/L<br><h2>$${fmt(getFloatingPL())}</h2></div>
 <div class="data-item">Total Capital<br>$${fmt(getTotalCapital(onboarding.value))}</div>
 <div class="data-item">First Close<br>${fc.toLocaleDateString()}</div>
 <div class="data-item">Last Activity<br>${last.toLocaleDateString()}</div>
