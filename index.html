@@ -5,7 +5,6 @@
 <title>Account Performance Checker</title>
 
 <style>
-  
 body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; color:#111; }
 .container { max-width:1200px;margin:auto; }
 
@@ -202,7 +201,7 @@ button:hover { background:#333; }
   <button onclick="runCustom()">Run Custom</button>
 </div>
 
-
+<br><br>
 
 <button onclick="showWeekly()">Weekly</button>
 <button onclick="run('30')">30 Days</button>
@@ -441,64 +440,50 @@ desc: `
 
 <h4>Core Metrics</h4>
 
-<p><b>Balance</b>
-
+<p><b>Balance</b><br>
 Final account value at the end of the selected period including all closed trades.</p>
 
-<p><b>Closed Profit</b>
-
+<p><b>Closed Profit</b><br>
 Total profit or loss from all closed trades within the selected timeframe.</p>
 
-<p><b>Floating P/L</b>
-
+<p><b>Floating P/L</b><br>
 Current unrealized profit or loss from open trades.</p>
 
-<p><b>Growth (%)</b>
-
+<p><b>Growth (%)</b><br>
 Percentage gain or loss relative to the starting balance of the selected period.</p>
 
-<p><b>Total Capital</b>
-
+<p><b>Total Capital</b><br>
 Starting balance before onboarding + deposits after onboarding − withdrawals.</p>
 
-<p><b>Track Record</b>
-
+<p><b>Track Record</b><br>
 Total number of days the account has been active from the first closed trade to the latest activity.</p>
 
-<p><b>First Close</b>
-
+<p><b>First Close</b><br>
 Date of the first closed trade after onboarding.</p>
 
-<p><b>Last Activity</b>
-
+<p><b>Last Activity</b><br>
 Most recent transaction or trade recorded.</p>
 
 <hr>
 
 <h4>Buttons & Actions</h4>
 
-<p><b>Weekly</b>
-
+<p><b>Weekly</b><br>
 Enables custom date range selection for short-term analysis.</p>
 
-<p><b>30 / 60 / 90 Days</b>
-
+<p><b>30 / 60 / 90 Days</b><br>
 Automatically generates reports based on predefined timeframes.</p>
 
-<p><b>Detailed Review</b>
-
+<p><b>Detailed Review</b><br>
 Provides a full performance breakdown including drawdown and recovery.</p>
 
-<p><b>Run Weekly</b>
-
+<p><b>Run Weekly</b><br>
 Executes analysis based on selected custom dates.</p>
 
-<p><b>Copy to GHL</b>
-
+<p><b>Copy to GHL</b><br>
 Copies a simplified version for CRM use.</p>
 
-<p><b>Copy to Email</b>
-
+<p><b>Copy to Email</b><br>
 Copies a structured version for client communication.</p>
 
 <hr>
@@ -518,28 +503,22 @@ calc: `
 
 <h4>Core Formulas</h4>
 
-<p><b>Balance</b>
-
+<p><b>Balance</b><br>
 Deposits − Withdrawals + Closed Profit</p>
 
-<p><b>Closed Profit</b>
-
+<p><b>Closed Profit</b><br>
 Sum of all net profit values from closed trades within the selected period</p>
 
-<p><b>Floating P/L</b>
-
+<p><b>Floating P/L</b><br>
 Sum of net profit from all open positions</p>
 
-<p><b>Growth (%)</b>
-
+<p><b>Growth (%)</b><br>
 (Closed Profit ÷ Starting Balance) × 100</p>
 
-<p><b>Total Capital</b>
-
+<p><b>Total Capital</b><br>
 (Balance before onboarding) + (Deposits after onboarding) − (Withdrawals after onboarding)</p>
 
-<p><b>Track Record</b>
-
+<p><b>Track Record</b><br>
 Last Activity Date − First Close Date</p>
 
 <hr>
@@ -566,7 +545,7 @@ Last Activity Date − First Close Date</p>
 
 function loadGuide(type){
 
-  document.getElementById("guideContent").innerText = guideData[type];
+  document.getElementById("guideContent").innerHTML = guideData[type];
 
   document.querySelectorAll(".guide-menu div")
     .forEach(el => el.classList.remove("active"));
@@ -591,26 +570,17 @@ function loadGuide(type){
   let text = content.innerText.toLowerCase();
 
   if(!input){
-    content.innerText = content.innerText; // reset (simple reload behavior)
+    content.innerHTML = content.innerHTML; // reset (simple reload behavior)
     return;
   }
 
-  let highlighted = content.innerText.replace(
+  let highlighted = content.innerHTML.replace(
     new RegExp(input, "gi"),
     match => `<mark>${match}</mark>`
   );
 
-  content.innerText = highlighted;
+  content.innerHTML = highlighted;
 } 
-
-function cleanText(text) {
-  return text
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]+/g, " ")
-    .replace(/^\s+|\s+$/gm, "")
-    .trim();
-}  
 // ===== SYSTEM =====
 function systemNarrative(system){
 if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
@@ -758,16 +728,11 @@ let d=analyze(start,end);
 let html=`
 <div class="section-title">${title}</div>
 <div class="data-grid-5">
-<div class="data-item">Balance
-<h3>$${fmt(d.endBal)}</h3></div>
-<div class="data-item">Closed Profit
-<h3>$${fmt(d.total)}</h3></div>
-<div class="data-item">Floating P/L
-<h3>$${fmt(getFloatingPL())}</h3></div>
-<div class="data-item">Growth
-<h3>${d.growth.toFixed(2)}%</h3></div>
-<div class="data-item">System
-<h3>${software.value||"N/A"}</h3></div>
+<div class="data-item">Balance<br><h3>$${fmt(d.endBal)}</h3></div>
+<div class="data-item">Closed Profit<br><h3>$${fmt(d.total)}</h3></div>
+<div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
+<div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
+<div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
 </div>
 `;
 
@@ -779,7 +744,7 @@ if(type==="detailed"){
 html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
 }
 
-breakdown.innerText=html;
+breakdown.innerHTML=html;
 ghlText=html.replace(/<[^>]*>/g,'');
 }
 
@@ -790,33 +755,24 @@ let first=getFirstClose(new Date(onboarding.value));
 let last=getLastActivity();
 let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
 
-overview.innerText=`
+overview.innerHTML=`
 <div class="section-title">Account Overview</div>
 
 <div class="data-grid-5">
-<div class="data-item">System
-<h3>${software.value||"N/A"}</h3></div>
-<div class="data-item">Balance
-<h3>$${fmt(getBalanceAt(last))}</h3></div>
-<div class="data-item">Closed Profit
-<h3>$${fmt(sum(get(r=>r.Type==="Closed position")))}</h3></div>
-<div class="data-item">Floating P/L
-<h3>$${fmt(getFloatingPL())}</h3></div>
-<div class="data-item">Growth
-<h3>${((sum(get(r=>r.Type==="Closed position"))/getBalanceAt(new Date(first["Close date"])))*100||0).toFixed(2)}%</h3></div>
+<div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
+<div class="data-item">Balance<br><h3>$${fmt(getBalanceAt(last))}</h3></div>
+<div class="data-item">Closed Profit<br><h3>$${fmt(sum(get(r=>r.Type==="Closed position")))}</h3></div>
+<div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
+<div class="data-item">Growth<br><h3>${((sum(get(r=>r.Type==="Closed position"))/getBalanceAt(new Date(first["Close date"])))*100||0).toFixed(2)}%</h3></div>
 </div>
 
-
+<br>
 
 <div class="data-grid-4">
-<div class="data-item">Total Capital
-<h3>$${fmt(getTotalCapital(onboarding.value))}</h3></div>
-<div class="data-item">Track Record
-<h3>${track} days</h3></div>
-<div class="data-item">First Close
-<h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
-<div class="data-item">Last Activity
-<h3>${last.toLocaleDateString()}</h3></div>
+<div class="data-item">Total Capital<br><h3>$${fmt(getTotalCapital(onboarding.value))}</h3></div>
+<div class="data-item">Track Record<br><h3>${track} days</h3></div>
+<div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
+<div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
 </div>
 `;
 }
