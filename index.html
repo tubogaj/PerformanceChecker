@@ -44,6 +44,7 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   text-transform:uppercase;
 }
 
+/* GUIDE MODAL */
 .guide-modal {
   position:fixed;
   top:0; left:0;
@@ -52,14 +53,47 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   display:none;
   align-items:center;
   justify-content:center;
+  z-index:999;
 }
 
 .guide-box {
-  width:600px;
+  width:900px;
+  height:600px;
   background:#fff;
-  border-radius:12px;
+  border-radius:16px;
+  display:flex;
+  overflow:hidden;
+}
+
+.guide-menu {
+  width:220px;
+  background:#111;
+  color:#fff;
   padding:20px;
-}  
+}
+
+.guide-menu div {
+  padding:12px;
+  cursor:pointer;
+  border-radius:8px;
+}
+.guide-menu div:hover { background:#333; }
+
+.guide-content {
+  flex:1;
+  padding:25px;
+  overflow:auto;
+}
+
+.close-btn {
+  position:absolute;
+  top:20px;
+  right:30px;
+  font-size:20px;
+  cursor:pointer;
+  color:#fff;
+}
+
 button {
   padding:10px 16px;
   border:none;
@@ -121,12 +155,6 @@ button:hover { background:#333; }
   
 <!-- GUIDE MODAL -->
 <div id="guideModal" class="guide-modal">
-  <div class="guide-box">
-    <h3>Guide</h3>
-    <p>Upload CSV → Select onboarding → Choose timeframe → Copy output</p>
-    <button onclick="closeGuide()">Close</button>
-  </div>
-</div>
   
 <script>
 function openGuide(){
@@ -204,6 +232,185 @@ let startBal=getBalanceAt(start);
 return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
 }
 
+let guideData = {
+
+how: `
+<h3>How To Use the System</h3>
+
+<h4>1. Upload Data</h4>
+<p>Select your CSV file using the upload button. This file must contain trading history including deposits, withdrawals, open and closed positions.</p>
+
+<h4>2. Select System</h4>
+<p>Choose the correct system (R2, R10, RS15, RA10, etc.). This determines how the narrative explains performance and how the system reacts to market conditions.</p>
+
+<h4>3. Set Onboarding Date</h4>
+<p>This defines the starting point of analysis. The system will only consider trades and activity after this date.</p>
+
+<hr>
+
+<h4>4. Choose Review Type</h4>
+
+<p><b>Weekly Review</b></p>
+<ul>
+<li>Select a custom start and end date.</li>
+<li>Click <b>Run Weekly</b>.</li>
+<li>Used for short-term performance tracking.</li>
+</ul>
+
+<p><b>30 Days</b></p>
+<ul>
+<li>Automatically calculates the first 30 days from the first closed trade.</li>
+<li>Focuses on early system behavior and adaptation.</li>
+</ul>
+
+<p><b>60 Days</b></p>
+<ul>
+<li>Analyzes full 60-day performance.</li>
+<li>Includes comparison between first 30 days and next 30 days.</li>
+<li>Shows performance progression.</li>
+</ul>
+
+<p><b>90 Days</b></p>
+<ul>
+<li>Provides a broader performance view.</li>
+<li>Highlights consistency, volatility, and long-term behavior.</li>
+</ul>
+
+<p><b>Detailed Review</b></p>
+<ul>
+<li>Analyzes the entire account history.</li>
+<li>Highlights drawdown, recovery, and balance progression.</li>
+<li>Best used for full client reporting.</li>
+</ul>
+
+<hr>
+
+<h4>5. Copy Functions</h4>
+
+<p><b>Copy to GHL</b></p>
+<ul>
+<li>Copies a clean, plain-text version of the analysis.</li>
+<li>Used for CRM notes or internal documentation.</li>
+</ul>
+
+<p><b>Copy to Email</b></p>
+<ul>
+<li>Copies a formatted version ready to send to clients.</li>
+<li>Maintains readability and structure.</li>
+</ul>
+
+<p><b>Tip:</b> Always review the generated summary before copying to ensure it aligns with your messaging.</p>
+`,
+
+desc: `
+<h3>System Features & Descriptions</h3>
+
+<h4>Core Metrics</h4>
+
+<p><b>Balance</b><br>
+Final account value at the end of the selected period.</p>
+
+<p><b>Closed Profit</b><br>
+Total profit or loss from all closed trades within the selected timeframe.</p>
+
+<p><b>Floating P/L</b><br>
+Current unrealized profit or loss from open trades.</p>
+
+<p><b>Growth (%)</b><br>
+Percentage gain or loss relative to the starting balance of the selected period.</p>
+
+<p><b>Total Capital</b><br>
+Net deposits minus withdrawals since onboarding.</p>
+
+<p><b>Track Record</b><br>
+Total number of days the account has been active.</p>
+
+<p><b>First Close</b><br>
+Date of the first closed trade after onboarding.</p>
+
+<p><b>Last Activity</b><br>
+Most recent transaction or trade recorded.</p>
+
+<hr>
+
+<h4>Buttons & Actions</h4>
+
+<p><b>Weekly</b><br>
+Enables custom date range selection for short-term analysis.</p>
+
+<p><b>30 / 60 / 90 Days</b><br>
+Automatically generates reports based on predefined timeframes.</p>
+
+<p><b>Detailed Review</b><br>
+Provides a full performance breakdown including drawdown and recovery.</p>
+
+<p><b>Run Weekly</b><br>
+Executes analysis based on selected custom dates.</p>
+
+<p><b>Copy to GHL</b><br>
+Copies a simplified version for CRM use.</p>
+
+<p><b>Copy to Email</b><br>
+Copies a structured version for client communication.</p>
+
+<hr>
+
+<h4>System Behavior</h4>
+
+<p>The selected system determines how trades are executed and how the account reacts to market conditions. Each system follows a different strategy model, which is reflected in the narrative.</p>
+`,
+
+calc: `
+<h3>Calculations & Logic</h3>
+
+<h4>System Description</h4>
+<p id="systemGuideText">Select a system to view behavior.</p>
+
+<hr>
+
+<h4>Core Formulas</h4>
+
+<p><b>Balance</b><br>
+Deposits − Withdrawals + Closed Profit</p>
+
+<p><b>Closed Profit</b><br>
+Sum of all net profit values from closed trades within the selected period</p>
+
+<p><b>Floating P/L</b><br>
+Sum of net profit from all open positions</p>
+
+<p><b>Growth (%)</b><br>
+(Closed Profit ÷ Starting Balance) × 100</p>
+
+<p><b>Total Capital</b><br>
+Deposits − Withdrawals (from onboarding date)</p>
+
+<p><b>Track Record</b><br>
+Last Activity Date − First Close Date</p>
+
+<hr>
+
+<h4>Time-Based Logic</h4>
+
+<p><b>30 Days:</b> First 30 days from initial trade</p>
+<p><b>60 Days:</b> First 60 days with internal 30 vs 30 comparison</p>
+<p><b>90 Days:</b> Extended performance evaluation</p>
+<p><b>Weekly:</b> Custom date range selected by user</p>
+<p><b>Detailed:</b> Full account lifecycle analysis</p>
+
+<hr>
+
+<h4>Important Notes</h4>
+
+<ul>
+<li>All calculations are based only on data within the selected timeframe.</li>
+<li>Growth is always relative to the starting balance of that timeframe.</li>
+<li>Open trades are excluded from closed profit but included in floating P/L.</li>
+</ul>
+`
+};
+
+  
 // ===== SYSTEM =====
 function systemNarrative(system){
 if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
