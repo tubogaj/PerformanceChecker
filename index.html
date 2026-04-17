@@ -272,6 +272,7 @@ function showWeekly(){
   hideAllDateSelectors();
   weeklyBox.style.display="block";
 
+
   if(weekStart.value && weekEnd.value){
     runWeekly();
   }
@@ -290,11 +291,7 @@ function runCustom(){
 
   render(new Date(s), new Date(e), "Custom Review", "custom");
 }
-function runWeekly(){
-  if(!weekStart.value || !weekEnd.value) return alert("Select dates");
-  render(new Date(weekStart.value), new Date(weekEnd.value), "Weekly Review","weekly");
-}
-  weekStart.onchange = autoWeekly;
+weekStart.onchange = autoWeekly;
 weekEnd.onchange = autoWeekly;
 
 function autoWeekly(){
@@ -852,7 +849,10 @@ if(!onboarding.value){
 let d=analyze(start,end);
 let first=getFirstClose(new Date(onboarding.value));
 let last=getLastActivity();
-let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
+let overviewFirst = getFirstClose(new Date(onboarding.value));
+let overviewLast = getLastActivity();
+
+let track = Math.floor((overviewLast - new Date(overviewFirst["Close date"])) / (1000*60*60*24)) + 1;
   
 let html = `
 <div class="data-grid-5">
@@ -869,8 +869,8 @@ if(type==="weekly"){
   <br>
   <div class="data-grid-4">
     <div class="data-item">Track Record<br><h3>${track} days</h3></div>
-    <div class="data-item"></div>
-    <div class="data-item"></div>
+    <div class="data-item">First Close<br><h3>${new Date(first["Close date"]).toLocaleDateString()}</h3></div>
+    <div class="data-item">Last Activity<br><h3>${last.toLocaleDateString()}</h3></div>
     <div class="data-item"></div>
   </div>
   `;
@@ -894,12 +894,8 @@ let first=getFirstClose(new Date(onboarding.value));
 if(!first) return;
 
 let last=getLastActivity();
-let overviewFirst = getFirstClose(new Date(onboarding.value));
-let overviewLast = getLastActivity();
+let track=Math.floor((last-new Date(first["Close date"]))/(1000*60*60*24))+1;
 
-let track = Math.floor((overviewLast - new Date(overviewFirst["Close date"])) / (1000*60*60*24)) + 1;
-
-  
 // ✅ FIX: define d properly using full range
 let start = new Date(first["Close date"]);
 let end = last;
