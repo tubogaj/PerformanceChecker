@@ -45,6 +45,75 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 }
 
 /* GUIDE MODAL */
+
+/* GLASS EFFECT */
+.guide-box {
+  width:950px;
+  height:620px;
+  border-radius:20px;
+  display:flex;
+  overflow:hidden;
+
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(20px);
+  border:1px solid rgba(255,255,255,0.2);
+}
+
+/* MENU */
+.guide-menu {
+  width:220px;
+  background: rgba(0,0,0,0.85);
+  color:#fff;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.guide-menu div {
+  padding:12px;
+  border-radius:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.guide-menu div:hover {
+  background:#333;
+  transform:translateX(3px);
+}
+
+.guide-menu div.active {
+  background:#444;
+}
+
+/* CONTENT */
+.guide-content {
+  flex:1;
+  padding:25px;
+  overflow:auto;
+  color:#111;
+}
+
+/* TYPOGRAPHY */
+.guide-content h3 {
+  margin-top:0;
+  font-size:22px;
+}
+
+.guide-content h4 {
+  margin-top:20px;
+  font-size:16px;
+  color:#333;
+}
+
+.guide-content p {
+  line-height:1.5;
+  margin:8px 0;
+}
+
+.guide-content ul {
+  padding-left:18px;
+}  
 .guide-modal {
   position:fixed;
   top:0; left:0;
@@ -154,20 +223,35 @@ button:hover { background:#333; }
 </div>
   
 <!-- GUIDE MODAL -->
+<!-- ===== GUIDE MODAL ===== -->
 <div id="guideModal" class="guide-modal">
 
   <div class="guide-box">
 
-    <!-- MENU -->
+    <!-- LEFT MENU -->
     <div class="guide-menu">
-      <div onclick="loadGuide('how')">How To</div>
-      <div onclick="loadGuide('desc')">Descriptions</div>
-      <div onclick="loadGuide('calc')">Calculations</div>
+      <div onclick="loadGuide('how')">📘 How To</div>
+      <div onclick="loadGuide('desc')">📊 Descriptions</div>
+      <div onclick="loadGuide('calc')">🧮 Calculations</div>
     </div>
 
-    <!-- CONTENT -->
-    <div class="guide-content" id="guideContent">
-      Select a category
+    <!-- RIGHT CONTENT -->
+    <div class="guide-content">
+
+      <!-- SEARCH -->
+      <input 
+        type="text" 
+        id="guideSearch" 
+        placeholder="Search guide..." 
+        oninput="searchGuide()" 
+        style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"
+      >
+
+      <!-- CONTENT -->
+      <div id="guideContent">
+        Select a category
+      </div>
+
     </div>
 
   </div>
@@ -240,10 +324,25 @@ return sum(rows.filter(r=>r.Type==="Open position").map(r=>+r["Net profit"]||0))
 }
 
 function getTotalCapital(onboardDate){
-let o=new Date(onboardDate);
-let deposits = sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=o));
-let withdrawals = sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=o));
-return deposits - Math.abs(withdrawals);
+
+let o = new Date(onboardDate);
+
+// ✅ 1. BALANCE BEFORE OR ON ONBOARDING
+let startingBalance =
+  sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=o))
+- sum(get(r=>r.Type==="Withdrawal" && new Date(r["Close date"])<=o))
++ sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=o));
+
+// ✅ 2. DEPOSITS AFTER ONBOARDING
+let depositsAfter =
+  sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>o));
+
+// ✅ 3. WITHDRAWALS AFTER ONBOARDING
+let withdrawalsAfter =
+  sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>o));
+
+// ✅ FINAL
+return startingBalance + depositsAfter - Math.abs(withdrawalsAfter);
 }
 
 function analyze(start,end){
@@ -260,6 +359,7 @@ how: `
 
 <h4>1. Upload Data</h4>
 <p>Select your CSV file using the upload button. This file must contain trading history including deposits, withdrawals, open and closed positions.</p>
+<p><i><b>Download the Excel file from FXBlue before uploading.</b></i></p>
 
 <h4>2. Select System</h4>
 <p>Choose the correct system (R2, R10, RS15, RA10, etc.). This determines how the narrative explains performance and how the system reacts to market conditions.</p>
@@ -287,8 +387,8 @@ how: `
 <p><b>60 Days</b></p>
 <ul>
 <li>Analyzes full 60-day performance.</li>
-<li>Includes comparison between first 30 days and next 30 days.</li>
-<li>Shows performance progression.</li>
+<li>Includes comparison between the first 30 days and the next 30 days.</li>
+<li>Shows performance progression and system adaptation.</li>
 </ul>
 
 <p><b>90 Days</b></p>
@@ -329,7 +429,7 @@ desc: `
 <h4>Core Metrics</h4>
 
 <p><b>Balance</b><br>
-Final account value at the end of the selected period.</p>
+Final account value at the end of the selected period including all closed trades.</p>
 
 <p><b>Closed Profit</b><br>
 Total profit or loss from all closed trades within the selected timeframe.</p>
@@ -341,10 +441,10 @@ Current unrealized profit or loss from open trades.</p>
 Percentage gain or loss relative to the starting balance of the selected period.</p>
 
 <p><b>Total Capital</b><br>
-Net deposits minus withdrawals since onboarding.</p>
+Starting balance before onboarding + deposits after onboarding − withdrawals.</p>
 
 <p><b>Track Record</b><br>
-Total number of days the account has been active.</p>
+Total number of days the account has been active from the first closed trade to the latest activity.</p>
 
 <p><b>First Close</b><br>
 Date of the first closed trade after onboarding.</p>
@@ -404,7 +504,7 @@ Sum of net profit from all open positions</p>
 (Closed Profit ÷ Starting Balance) × 100</p>
 
 <p><b>Total Capital</b><br>
-Deposits − Withdrawals (from onboarding date)</p>
+(Balance before onboarding) + (Deposits after onboarding) − (Withdrawals after onboarding)</p>
 
 <p><b>Track Record</b><br>
 Last Activity Date − First Close Date</p>
@@ -432,8 +532,16 @@ Last Activity Date − First Close Date</p>
 };
 
 function loadGuide(type){
+
   document.getElementById("guideContent").innerHTML = guideData[type];
 
+  // ACTIVE STATE
+  document.querySelectorAll(".guide-menu div")
+    .forEach(el => el.classList.remove("active"));
+
+  event.target.classList.add("active");
+
+  // SYSTEM TEXT (CALC TAB)
   if(type==="calc"){
     let system = document.getElementById("software").value;
     if(system){
@@ -441,6 +549,26 @@ function loadGuide(type){
     }
   }
 }
+
+ function searchGuide(){
+
+  let input = document.getElementById("guideSearch").value.toLowerCase();
+  let content = document.getElementById("guideContent");
+
+  let text = content.innerText.toLowerCase();
+
+  if(!input){
+    content.innerHTML = content.innerHTML; // reset (simple reload behavior)
+    return;
+  }
+
+  let highlighted = content.innerHTML.replace(
+    new RegExp(input, "gi"),
+    match => `<mark>${match}</mark>`
+  );
+
+  content.innerHTML = highlighted;
+} 
 // ===== SYSTEM =====
 function systemNarrative(system){
 if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
