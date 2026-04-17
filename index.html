@@ -18,7 +18,7 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 }
 
 .header { display:flex; justify-content:space-between; align-items:center; }
-.logo { height:200px; }
+.logo { height:40px; }
 
 .file-row { display:flex; align-items:center; gap:15px; margin-bottom:10px; }
 
@@ -167,27 +167,28 @@ return sum(get(r=>r.Type==="Deposit" && new Date(r["Close date"])<=d))
 + sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 }
 
-function getTotalCapital(o){
-let d=new Date(o);
-return getBalanceAt(d)
-+ sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=d))
-+ sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=d));
+// ===== ANALYZE =====
+function analyze(start,end){
+let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
+let total=sum(trades.map(r=>+r["Net profit"]||0));
+let startBal=getBalanceAt(start);
+return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
 }
 
 // ===== SYSTEM =====
 function systemNarrative(system){
-if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
+if(system==="R2") return "This reflects grid-based execution where positions are layered, and recovery is driven by price retracement.";
 if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
 if(["R10","R50","R400"].includes(system)) return "This reflects a diversified AI allocation model adapting across multiple strategies.";
 if(system==="RX25") return "This reflects adaptive exposure across forex and gold based on volatility.";
 if(system==="RX5") return "This reflects a conservative allocation approach focused on stability.";
 if(system==="RC30") return "This reflects high-volatility crypto market behavior.";
-if(system==="RS15") return "This reflects event-driven trading with selective participation.";
+if(system==="RS15") return "This mainly focuses on intraday strategy and event-driven trading with selective participation.";
 if(system==="RA10") return "This reflects reversal-based execution focused on turning points.";
 return "";
 }
 
-// ===== ORIGINAL + ADAPTIVE =====
+// ===== YOUR EXACT NARRATIVE =====
 function generateNarrative(start,end,type){
 
 let d=analyze(start,end);
@@ -268,18 +269,50 @@ Performance remains dependent on market conditions, and early fluctuations are p
 }
 }
 
-// ===== ANALYZE =====
-function analyze(start,end){
-let trades=rows.filter(r=>r.Type==="Closed position" && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end);
-let total=sum(trades.map(r=>+r["Net profit"]||0));
-let startBal=getBalanceAt(start);
-return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0 };
-}
 
-// ===== DETAILED =====
+// ===== DETAILED STORY =====
 function detailedNarrative(start,end){
+
 let d=analyze(start,end);
-return `<div class="data-item">Full account review completed. Total closed profit: $${fmt(d.total)}.</div>`;
+let system=document.getElementById("software").value;
+let positive=d.total>=0;
+
+let balances=[];
+rows.forEach(r=>{
+if(r.Type==="Closed position"){
+let dt=new Date(r["Close date"]);
+if(dt>=start&&dt<=end){
+balances.push({dt,b:getBalanceAt(dt)});
+}
+}
+});
+
+if(!balances.length) return "";
+
+let init=balances[0].b;
+let low=Math.min(...balances.map(x=>x.b));
+let lowObj=balances.find(x=>x.b===low);
+let final=balances.at(-1).b;
+
+return `<div class="data-item">
+
+The account started at $${fmt(init)} on ${balances[0].dt.toLocaleDateString()} and progressed through varying market conditions.
+
+At its lowest point, the balance reached $${fmt(low)} on ${lowObj.dt.toLocaleDateString()}, reflecting how the system responded during periods of unfavorable market movement.
+
+${final>init
+? `Following this phase, the account demonstrated recovery, reaching $${fmt(final)}, showing the system's ability to adapt and stabilize as conditions improved.`
+: `The account is currently at $${fmt(final)}, reflecting an ongoing drawdown phase where the system continues to manage exposure carefully.`}
+
+${systemNarrative(system)}
+
+${!positive ? "The master account applies equity protection mechanisms, ensuring positions are managed carefully and exposure is reduced during unfavorable market conditions. This allows the system to slow down and avoid excessive risk while waiting for better opportunities." : ""}
+
+Overall, the system generated $${fmt(d.total)} in closed profit over this period.
+
+Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
+
+</div>`;
 }
 
 // ===== RUN =====
@@ -300,20 +333,12 @@ render(s,e,"Detailed Review","detailed");
 function render(start,end,title,type){
 
 let d=analyze(start,end);
-let first=getFirstClose(new Date(onboarding.value));
-let firstDate=new Date(first["Close date"]);
-let lastDate=new Date(Math.max(...rows.map(r=>new Date(r["Close date"]))));
-let track=Math.floor((lastDate-firstDate)/(1000*60*60*24))+1;
 
-let html=`
-<div class="section-title">${title}</div>
+let html=`<div class="section-title">${title}</div>
 <div class="data-grid">
 <div class="data-item">Balance: $${fmt(d.endBal)}</div>
 <div class="data-item">Closed Profit: $${fmt(d.total)}</div>
 <div class="data-item">Growth: ${d.growth.toFixed(2)}%</div>
-<div class="data-item">Track Record: ${track} days</div>
-<div class="data-item">First Close: ${firstDate.toLocaleDateString()}</div>
-<div class="data-item">Last Activity: ${lastDate.toLocaleDateString()}</div>
 </div>`;
 
 if(["30","60","90"].includes(type)){
@@ -325,12 +350,11 @@ html+=`<div class="section-title">Performance Summary</div>${detailedNarrative(s
 }
 
 breakdown.innerHTML=html;
-ghlText=html.replace(/<[^>]*>/g,'');
-
 }
 
 // ===== OVERVIEW =====
 function renderAccount(){
+
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
 
 let fc=new Date(f["Close date"]);
