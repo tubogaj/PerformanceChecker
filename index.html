@@ -132,53 +132,12 @@ let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 return dep-wd+cl;
 }
 
-// ===== SYSTEM STORY =====
-function systemNarrative(system, profit){
-
-if(system==="R2") return "This behavior aligns with a grid-based strategy, where positions are layered during price movement and recovery occurs through mean reversion.";
-if(system==="R2.5") return "This reflects an amplified grid approach, where larger position sizing leads to faster growth potential but also more pronounced fluctuations.";
-if(["R10","R50","R400"].includes(system)) return "This is consistent with a multi-strategy AI allocation model, where performance is driven by diversified execution across multiple currency pairs.";
-if(system==="RX25") return "This reflects adaptive exposure across forex and gold, adjusting dynamically based on volatility and market structure.";
-if(system==="RX5") return "This aligns with a more conservative allocation model focused on stability and controlled growth.";
-if(system==="RC30") return "This behavior is consistent with crypto market exposure, where higher volatility leads to stronger directional swings.";
-if(system==="RS15") return "This reflects an event-driven intraday strategy, where trades occur selectively during high-impact market conditions.";
-if(system==="RA10") return "This aligns with a reversal-based system, focusing on high-probability turning points rather than continuous market participation.";
-
-return "";
+function getDepositsWithdrawals(start,end){
+let deposits=sum(get(r=>r.Type==="Deposit" && Number(r["Net profit"])>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let withdrawals=sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+return {deposits, withdrawals};
 }
 
-// ===== NET CAPITAL =====
-function getTotalNetCapital(){
-let deposits=sum(get(r=>r.Type==="Deposit"));
-let withdrawals=sum(get(r=>r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)));
-return deposits + withdrawals;
-}
-
-function getNetDeposits(start,end){
-let deposits=sum(get(r =>
-(r.Type==="Deposit") &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end
-));
-
-let withdrawals=sum(get(r =>
-(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end
-));
-
-return deposits + withdrawals;
-}
-
-function getWithdrawals(start,end){
-return sum(get(r =>
-(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) &&
-new Date(r["Close date"])>=start &&
-new Date(r["Close date"])<=end
-));
-}
-
-// ===== ANALYSIS =====
 function analyzePeriod(start,end){
 let trades=rows.filter(r=>r.Type==="Closed position" &&
 new Date(r["Close date"])>=start &&
@@ -187,12 +146,26 @@ new Date(r["Close date"])<=end);
 let profits=trades.map(r=>Number(r["Net profit"])||0);
 let total=sum(profits);
 
-let netDeposits=getNetDeposits(start,end);
-let endBal=getBalanceAt(end);
-let growth=netDeposits?(total/netDeposits)*100:0;
-let withdrawals=getWithdrawals(start,end);
+let dep=getDepositsWithdrawals(start,end);
 
-return {trades,total,endBal,growth,withdrawals};
+let startBal=getBalanceAt(start);
+let endBal=getBalanceAt(end);
+let growth=startBal?(total/startBal)*100:0;
+
+return {trades,total,startBal,endBal,growth,deposits:dep.deposits,withdrawals:dep.withdrawals};
+}
+
+// ===== SYSTEM =====
+function systemNarrative(system){
+if(system==="R2") return "This reflects grid-based execution where positions are layered and recovery is driven by price retracement.";
+if(system==="R2.5") return "This reflects an amplified grid strategy where exposure increases both growth and drawdown cycles.";
+if(["R10","R50","R400"].includes(system)) return "This reflects a diversified AI allocation model adapting across multiple strategies.";
+if(system==="RX25") return "This reflects adaptive exposure across forex and gold based on volatility.";
+if(system==="RX5") return "This reflects a conservative allocation approach focused on stability.";
+if(system==="RC30") return "This reflects high-volatility crypto market behavior.";
+if(system==="RS15") return "This reflects event-driven trading with selective participation.";
+if(system==="RA10") return "This reflects reversal-based execution focused on turning points.";
+return "";
 }
 
 // ===== NARRATIVE =====
@@ -201,22 +174,66 @@ function generateNarrative(start,end,type){
 let d=analyzePeriod(start,end);
 let system=document.getElementById("software").value;
 
-let withdrawalNote="";
-if(Math.abs(d.withdrawals)>0){
-withdrawalNote=`A withdrawal of $${fmt(Math.abs(d.withdrawals))} occurred during this period, which impacts the balance progression.`;
-}
+let capitalFlow = "";
+if(d.deposits>0) capitalFlow += `A deposit of $${fmt(d.deposits)} was made during this period. `;
+if(Math.abs(d.withdrawals)>0) capitalFlow += `A withdrawal of $${fmt(Math.abs(d.withdrawals))} occurred during this period.`;
+
+if(type==="60"){
+let mid=new Date(start); mid.setDate(mid.getDate()+29);
+let first30=analyzePeriod(start,mid);
+let next30=analyzePeriod(mid,end);
 
 return `<div class="data-item">
-The system ${d.total>=0?"generated a positive result":"closed at a net loss"}.
 
-It executed ${d.trades.length} trades, producing $${fmt(d.total)} and reaching a balance of $${fmt(d.endBal)}, representing ${d.growth.toFixed(2)}%.
+The account recorded a growth of ${d.growth.toFixed(2)}% over the 60-day period.
 
-${systemNarrative(system,d.total)}
+The balance movement during this timeframe reflects both trading activity and capital adjustments. ${capitalFlow}
 
-${withdrawalNote}
+The system generated a total closed profit of $${fmt(d.total)} over the period.
+
+During the first 30 days, the account produced $${fmt(first30.total)}, while the following 30-day period resulted in $${fmt(next30.total)}, providing a clear comparison of how performance evolved.
+
+${systemNarrative(system)}
 
 Performance remains dependent on market conditions, and fluctuations including drawdown and recovery are part of normal system behavior.
+
 </div>`;
+}
+
+if(type==="90"){
+return `<div class="data-item">
+
+The account recorded a growth of ${d.growth.toFixed(2)}% over the 90-day period.
+
+The balance movement during this timeframe reflects both trading performance and any capital adjustments made. ${capitalFlow}
+
+The system generated a total closed profit of $${fmt(d.total)} across the period.
+
+${systemNarrative(system)}
+
+This longer duration provides a clearer view of how the system behaves across different market conditions, including periods of volatility, stability, and recovery.
+
+Performance remains dependent on market conditions, and variability should still be expected moving forward.
+
+</div>`;
+}
+
+if(type==="30"){
+return `<div class="data-item">
+
+The account recorded a growth of ${d.growth.toFixed(2)}% over the first 30 days.
+
+The balance movement reflects early-stage execution along with any capital adjustments. ${capitalFlow}
+
+The system generated a closed profit of $${fmt(d.total)} during this period.
+
+${systemNarrative(system)}
+
+Performance remains dependent on market conditions, and early fluctuations are part of normal system behavior.
+
+</div>`;
+}
+
 }
 
 // ===== ENGINE =====
@@ -330,8 +347,6 @@ let closed=sum(get(r=>r.Type==="Closed position"));
 let startBal=getBalanceAt(firstClose);
 let growth=startBal?(closed/startBal)*100:0;
 
-let netCapital=getTotalNetCapital();
-
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
 
@@ -340,13 +355,12 @@ document.getElementById("overview").innerHTML=`
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
-<div class="data-item">Net Capital<br>${netCapital>=0?"+":"-"}$${fmt(Math.abs(netCapital))}</div>
 <div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
 <div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
 </div>
 
-<div class="note">Net Capital reflects total deposits minus withdrawals</div>
+<div class="note">Auto-calculated based on account history</div>
 `;
 }
 
