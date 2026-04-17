@@ -752,11 +752,11 @@ let d=analyze(start,end);
 let html=`
 <div class="section-title">${title}</div>
 <div class="data-grid-5">
+<div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
 <div class="data-item">Balance<br><h3>$${fmt(d.endBal)}</h3></div>
 <div class="data-item">Closed Profit<br><h3>$${fmt(d.total)}</h3></div>
 <div class="data-item">Floating P/L<br><h3>$${fmt(getFloatingPL())}</h3></div>
 <div class="data-item">Growth<br><h3>${d.growth.toFixed(2)}%</h3></div>
-<div class="data-item">System<br><h3>${software.value||"N/A"}</h3></div>
 </div>
 `;
 
@@ -810,27 +810,37 @@ overview.innerHTML=`
 function copyNote(){
 
   let title = document.querySelector("#breakdown .section-title")?.innerText || "";
-  let content = "";
+  let output = "";
 
+  // ===== GET DATA GRID VALUES CLEANLY =====
+  let items = document.querySelectorAll("#breakdown .data-grid-5 .data-item");
+
+  let cleanData = [];
+
+  items.forEach(item => {
+    let lines = item.innerText.split("\n").map(x => x.trim()).filter(Boolean);
+
+    if(lines.length >= 2){
+      cleanData.push(`${lines[0]}: ${lines[1]}`);
+    }
+  });
+
+  // ===== WEEKLY = DATA ONLY =====
   if(title.toLowerCase().includes("weekly")){
-    // ✅ ONLY DATA (NO SUMMARY)
-    let grid = document.querySelector("#breakdown .data-grid-5");
-    content = grid ? grid.innerText : "";
+    output = cleanData.join("\n");
   }
-  else if(title.toLowerCase().includes("custom")){
-    // ✅ FULL CONTENT
-    content = document.getElementById("breakdown").innerText;
-  }
+
+  // ===== CUSTOM + OTHERS = FULL =====
   else{
-    // ✅ DEFAULT (30/60/90/DETAILED)
-    content = document.getElementById("breakdown").innerText;
+    let fullText = document.getElementById("breakdown").innerText
+      .replace(/\n{3,}/g,"\n\n")
+      .trim();
+
+    output = cleanData.join("\n") + "\n\n" + fullText;
   }
 
-  navigator.clipboard.writeText(
-    content.replace(/\n{3,}/g,"\n\n").trim()
-  );
-
-  alert("Copied for GHL");
+  navigator.clipboard.writeText(output);
+  alert("Copied clean for GHL");
 }
 
 </script>
