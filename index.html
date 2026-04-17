@@ -132,6 +132,16 @@ let cl=sum(get(r=>r.Type==="Closed position" && new Date(r["Close date"])<=d));
 return dep-wd+cl;
 }
 
+// ===== TOTAL CAPITAL =====
+function getTotalCapital(firstClose){
+let startingBalance = getBalanceAt(firstClose);
+
+let deposits = sum(get(r=>r.Type==="Deposit"));
+let withdrawals = sum(get(r=>r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)));
+
+return startingBalance + deposits + withdrawals;
+}
+
 function getDepositsWithdrawals(start,end){
 let deposits=sum(get(r=>r.Type==="Deposit" && Number(r["Net profit"])>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
 let withdrawals=sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && Number(r["Net profit"])<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
@@ -347,6 +357,8 @@ let closed=sum(get(r=>r.Type==="Closed position"));
 let startBal=getBalanceAt(firstClose);
 let growth=startBal?(closed/startBal)*100:0;
 
+let totalCapital=getTotalCapital(firstClose);
+
 document.getElementById("overview").innerHTML=`
 <div class="section-title">Overview</div>
 
@@ -355,12 +367,13 @@ document.getElementById("overview").innerHTML=`
 <div class="data-item">Balance<br><h2>$${fmt(endBal)}</h2></div>
 <div class="data-item">Growth<br><h2>${growth.toFixed(2)}%</h2></div>
 <div class="data-item">Closed Profit<br>$${fmt(closed)}</div>
+<div class="data-item">Total Capital<br>$${fmt(totalCapital)}</div>
 <div class="data-item">First Close<br>${firstClose.toLocaleDateString()}</div>
 <div class="data-item">Last Activity<br>${lastActivity.toLocaleDateString()}</div>
 <div class="data-item">Track Record<br>${duration} days</div>
 </div>
 
-<div class="note">Auto-calculated based on account history</div>
+<div class="note">Total Capital = starting balance + deposits - withdrawals</div>
 `;
 }
 
