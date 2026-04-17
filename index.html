@@ -748,7 +748,7 @@ let html=`
 </div>
 `;
 
-if(type!=="detailed"){
+if(type!=="detailed" && type!=="weekly"){
 html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
 }
 
