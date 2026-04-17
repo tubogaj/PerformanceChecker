@@ -290,6 +290,22 @@ function runWeekly(){
 }
 
 let rows=[], ghlText="";
+// ===== FIX MISSING ELEMENT REFERENCES =====
+const weeklyBox = document.getElementById("weeklyBox");
+const customBox = document.getElementById("customBox");
+
+const weekStart = document.getElementById("weekStart");
+const weekEnd = document.getElementById("weekEnd");
+
+const customStart = document.getElementById("customStart");
+const customEnd = document.getElementById("customEnd");
+
+const fileInput = document.getElementById("fileInput");
+const onboarding = document.getElementById("onboarding");
+const software = document.getElementById("software");
+
+const overview = document.getElementById("overview");
+const breakdown = document.getElementById("breakdown");
 const fmt=v=>Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
 fileInput.onchange=init;
@@ -570,7 +586,7 @@ function loadGuide(type){
   let text = content.innerText.toLowerCase();
 
   if(!input){
-    content.innerHTML = content.innerHTML; // reset (simple reload behavior)
+    loadGuide('how'); // reset (simple reload behavior)
     return;
   }
 
@@ -722,7 +738,15 @@ render(s,e,"Detailed Review","detailed");
 
 // ===== RENDER =====
 function render(start,end,title,type){
+if(!rows.length){
+  alert("Upload CSV first");
+  return;
+}
 
+if(!onboarding.value){
+  alert("Select onboarding date");
+  return;
+}
 let d=analyze(start,end);
 
 let html=`
@@ -737,7 +761,12 @@ let html=`
 `;
 
 if(type!=="detailed" && type!=="weekly"){
-html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
+  html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
+}
+
+// Weekly still shows summary visually (optional)
+if(type==="weekly"){
+  html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,"30")}`;
 }
 
 if(type==="detailed"){
@@ -780,14 +809,20 @@ overview.innerHTML=`
 // ===== COPY =====
 function copyNote(){
 
+  let title = document.querySelector("#breakdown .section-title")?.innerText || "";
   let content = "";
 
-  let title = document.querySelector("#breakdown .section-title")?.innerText || "";
-
   if(title.toLowerCase().includes("weekly")){
+    // ✅ ONLY DATA (NO SUMMARY)
     let grid = document.querySelector("#breakdown .data-grid-5");
     content = grid ? grid.innerText : "";
-  } else {
+  }
+  else if(title.toLowerCase().includes("custom")){
+    // ✅ FULL CONTENT
+    content = document.getElementById("breakdown").innerText;
+  }
+  else{
+    // ✅ DEFAULT (30/60/90/DETAILED)
     content = document.getElementById("breakdown").innerText;
   }
 
@@ -797,7 +832,6 @@ function copyNote(){
 
   alert("Copied for GHL");
 }
-function copyEmail(){ navigator.clipboard.writeText(ghlText); alert("Copied for Email"); }
 
 </script>
 
