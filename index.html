@@ -721,7 +721,64 @@ ${win
 
 </div>`;
 }
+// ===== DETAILED NARRATIVE (ADD THIS WHOLE BLOCK) =====
+function detailedNarrative(start,end){
 
+let d = analyze(start,end);
+
+let balances=[];
+rows.forEach(r=>{
+  if(r.Type==="Closed position"){
+    let dt=new Date(r["Close date"]);
+    if(dt>=start && dt<=end){
+      balances.push({dt,b:getBalanceAt(dt)});
+    }
+  }
+});
+
+if(!balances.length) return "";
+
+let initial = balances[0].b;
+let initialDate = balances[0].dt;
+
+let lowest = Math.min(...balances.map(x=>x.b));
+let lowestObj = balances.find(x=>x.b===lowest);
+
+let finalBal = balances[balances.length-1].b;
+let lastDate = balances[balances.length-1].dt;
+
+// deposits & withdrawals
+let deposits = sum(get(r=>r.Type==="Deposit" && +r["Net profit"]>0 && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+let withdrawals = sum(get(r=>(r.Type==="Withdrawal" || (r.Type==="Deposit" && +r["Net profit"]<0)) && new Date(r["Close date"])>=start && new Date(r["Close date"])<=end));
+
+let ddPct = ((lowest-initial)/initial)*100;
+let growthPct = ((finalBal-initial)/initial)*100;
+
+let recovered = finalBal > lowest;
+
+return `<div class="data-item">
+
+The account began this period on ${initialDate.toLocaleDateString()} with a starting balance of $${fmt(initial)}.
+
+${deposits>0 ? `During this timeframe, a total deposit of $${fmt(deposits)} was added to the account.` : ""}
+${Math.abs(withdrawals)>0 ? `A total withdrawal of $${fmt(Math.abs(withdrawals))} was made during this period.` : ""}
+
+As trading activity progressed, the account experienced fluctuations, reaching a low of $${fmt(lowest)} on ${lowestObj.dt.toLocaleDateString()}, representing a drawdown of ${ddPct.toFixed(2)}%.
+
+${recovered
+? `Following this decline, the account demonstrated recovery, regaining strength and stabilizing above its lower levels.`
+: `The account has not yet fully recovered from this drawdown phase.`}
+
+As of the last recorded activity on ${lastDate.toLocaleDateString()}, the account balance stands at $${fmt(finalBal)}.
+
+Overall, the system generated a total closed profit of $${fmt(d.total)}, resulting in a growth of ${growthPct.toFixed(2)}% over the period.
+
+This performance illustrates how the system navigates changing market conditions, adapting through both drawdown and recovery phases.
+
+</div>`;
+}
+
+// ===== RUN =====
 // ===== RUN =====
 function run(type){
 let f=getFirstClose(new Date(onboarding.value)); if(!f) return;
@@ -762,11 +819,6 @@ let html=`
 
 if(type!=="detailed" && type!=="weekly"){
   html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,type)}`;
-}
-
-// Weekly still shows summary visually (optional)
-if(type==="weekly"){
-  html+=`<div class="section-title">Summary</div>${generateNarrative(start,end,"30")}`;
 }
 
 if(type==="detailed"){
