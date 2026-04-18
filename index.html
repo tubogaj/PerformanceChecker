@@ -191,7 +191,6 @@ button:hover { background:#333; }
 <div id="weeklyBox" style="display:none">
   <input type="date" id="weekStart">
   <input type="date" id="weekEnd">
-  <button onclick="runWeekly()">Run Weekly</button>
 </div>
 
 <!-- NEW CUSTOM BOX -->
@@ -294,6 +293,14 @@ function runCustom(){
 function runWeekly(){
   if(!weekStart.value || !weekEnd.value) return alert("Select dates");
   render(new Date(weekStart.value), new Date(weekEnd.value), "Weekly Review","weekly");
+}
+  weekStart.onchange = autoWeekly;
+weekEnd.onchange = autoWeekly;
+
+function autoWeekly(){
+  if(weekStart.value && weekEnd.value){
+    runWeekly();
+  }
 }
 
 let rows=[], ghlText="";
@@ -878,6 +885,10 @@ if(type!=="detailed" && type!=="weekly"){
 
 if(type==="detailed"){
   html += `<div class="section-title">Performance Summary</div>${detailedNarrative(start,end)}`;
+}
+  breakdown.innerHTML = html;
+ghlText = html.replace(/<[^>]*>/g,'');
+
 }
 
 // ===== OVERVIEW =====
