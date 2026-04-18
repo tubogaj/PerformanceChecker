@@ -956,7 +956,7 @@ function copyNote(){
   let hasSummary = document.querySelector("#breakdown .section-title");
 
   // ===== GET MAIN METRICS =====
-  let items = document.querySelectorAll("#breakdown .data-grid-5 .data-item");
+  let items = document.querySelectorAll("#breakdown .data-item");
 
   let data = {};
 
@@ -968,15 +968,16 @@ function copyNote(){
   });
 
   // ===== GET TRACK RECORD (if exists) =====
-  let trackEl = document.querySelector("#breakdown .data-grid-4 .data-item");
+let track = "";
 
-  let track = "";
-  if(trackEl){
-    let t = trackEl.innerText.split("\n").map(x => x.trim()).filter(Boolean);
-    if(t.length >= 2){
-      track = t[1];
-    }
+let allItems = document.querySelectorAll("#breakdown .data-item");
+
+allItems.forEach(item => {
+  let lines = item.innerText.split("\n").map(x => x.trim()).filter(Boolean);
+  if(lines[0] === "Track Record" && lines[1]){
+    track = lines[1];
   }
+});
 
   // ===== BUILD OUTPUT =====
   let output =
