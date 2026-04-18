@@ -932,38 +932,58 @@ overview.innerHTML=`
 // ===== COPY =====
 function copyNote(){
 
-  let title = document.querySelector("#breakdown .section-title")?.innerText || "";
+  // ===== DETECT TYPE =====
+  let hasSummary = document.querySelector("#breakdown .section-title");
 
-  // ===== GET DATA GRID CLEAN =====
+  // ===== GET MAIN METRICS =====
   let items = document.querySelectorAll("#breakdown .data-grid-5 .data-item");
 
-  let cleanData = [];
+  let data = {};
 
   items.forEach(item => {
     let lines = item.innerText.split("\n").map(x => x.trim()).filter(Boolean);
     if(lines.length >= 2){
-      cleanData.push(`${lines[0]}: ${lines[1]}`);
+      data[lines[0]] = lines[1];
     }
   });
 
-  // ===== GET FULL TEXT CLEAN =====
-  let fullText = document.getElementById("breakdown").innerText
-    .replace(/\n{3,}/g,"\n\n")
-    .replace(/[ \t]+/g," ")
-    .trim();
+  // ===== GET TRACK RECORD (if exists) =====
+  let trackEl = document.querySelector("#breakdown .data-grid-4 .data-item");
 
-  // ✅ FINAL OUTPUT (UNIFIED FOR ALL TYPES)
+  let track = "";
+  if(trackEl){
+    let t = trackEl.innerText.split("\n").map(x => x.trim()).filter(Boolean);
+    if(t.length >= 2){
+      track = t[1];
+    }
+  }
+
+  // ===== BUILD OUTPUT =====
   let output =
-    `${title}\n\n` +
-    cleanData.join("\n") +
-    "\n\n" +
-    fullText;
+`System: ${data["System"] || ""}
+Balance: ${data["Balance"] || ""}
+Closed Profit: ${data["Closed Profit"] || ""}
+Floating P/L: ${data["Floating P/L"] || ""}
+Growth: ${data["Growth"] || ""}
+Track Record: ${track}`;
 
+  // ===== ADD SUMMARY ONLY IF EXISTS (NOT WEEKLY) =====
+  if(hasSummary){
+    let summaryText = document.querySelector("#breakdown .section-title + .data-item");
+
+    if(summaryText){
+      output += `
+
+Performance Summary:
+
+${summaryText.innerText.trim()}`;
+    }
+  }
+
+  // ===== COPY =====
   navigator.clipboard.writeText(output);
   alert("Copied clean for GHL");
 }
-
-
   
 </script>
 
