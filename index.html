@@ -68,16 +68,16 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
 /* MENU */
 .guide-menu {
   width:220px;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.9);
   color:#fff;
-  padding:20px;
+  padding:16px;
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:6px;
 }
 
 .guide-menu div {
-  padding:12px;
+  padding:10px;
   border-radius:10px;
   cursor:pointer;
   transition:0.2s;
@@ -131,23 +131,59 @@ body { font-family:-apple-system,'Segoe UI'; background:#f4f4f5; padding:50px; c
   z-index:999;
 }
 
-.guide-menu {
-  width:220px;
-  background:#111;
-  color:#fff;
+.guide-content {
+  flex:1;
   padding:20px;
+  overflow:auto;
+  color:#111;
+  font-size:13px; /* ✅ normal readable size */
+  line-height:1.4;
+}
+
+/* HEADINGS */
+.guide-content h3 {
+  margin-top:0;
+  font-size:18px;
+  margin-bottom:8px;
+}
+
+.guide-content h4 {
+  margin-top:12px;
+  margin-bottom:6px;
+  font-size:14px;
+  color:#333;
+}
+
+/* TEXT */
+.guide-content p {
+  margin:4px 0;
+}
+
+/* LISTS */
+.guide-content ul {
+  padding-left:16px;
+  margin:4px 0 8px 0;
+}
+
+.guide-content li {
+  margin:2px 0;
+}
+
+/* HR SPACING */
+.guide-content hr {
+  margin:10px 0;
+  border:none;
+  border-top:1px solid #eee;
 }
 
 .guide-menu div {
-  padding:12px;
+  padding:10px;
   cursor:pointer;
   border-radius:8px;
 }
 .guide-menu div:hover { background:#333; }
 
-.guide-content {
-  padding:30px;
-}
+
 
 .close-btn {
   position:absolute;
@@ -427,178 +463,201 @@ return { total, endBal:getBalanceAt(end), growth:startBal?(total/startBal)*100:0
 let guideData = {
 
 how: `
-<h3>How To Use the System</h3>
+<h3>How to Use the System</h3>
 
-<h4>1. Upload Data</h4>
-<p>Select your CSV file using the upload button. This file must contain trading history including deposits, withdrawals, open and closed positions.</p>
-<p><i><b>Download the Excel file from FXBlue before uploading.</b></i></p>
+<h4>1. Upload Trading Data</h4>
+<p>Select and upload your CSV file containing the account’s trading history. Ensure the file includes deposits, withdrawals, and both open and closed trades.</p>
+<p><i>Note: Download the file directly from FXBlue to ensure compatibility.</i></p>
 
 <h4>2. Select System</h4>
-<p>Choose the correct system (R2, R10, RS15, RA10, etc.). This determines how the narrative explains performance and how the system reacts to market conditions.</p>
+<p>Choose the appropriate system (e.g., R2, R10, RS15, RA10). This determines how performance is interpreted and how the narrative reflects market behavior.</p>
 
 <h4>3. Set Onboarding Date</h4>
-<p>This defines the starting point of analysis. The system will only consider trades and activity after this date.</p>
+<p>This defines the starting point of the analysis. Only trades and transactions from this date onward will be included.</p>
 
 <hr>
 
-<h4>4. Choose Review Type</h4>
+<h4>4. Select a Review Type</h4>
 
 <p><b>Weekly Review</b></p>
 <ul>
-<li>Select a custom start and end date.</li>
-<li>Click <b>Run Weekly</b>.</li>
-<li>Used for short-term performance tracking.</li>
+<li>Select a start and end date.</li>
+<li>Results are calculated automatically once both dates are set.</li>
+<li>Displays key metrics only (no performance summary).</li>
 </ul>
 
-<p><b>30 Days</b></p>
+<p><b>30-Day Review</b></p>
 <ul>
-<li>Automatically calculates the first 30 days from the first closed trade.</li>
-<li>Focuses on early system behavior and adaptation.</li>
+<li>Analyzes the first 30 days from the initial closed trade.</li>
+<li>Highlights early system performance and behavior.</li>
 </ul>
 
-<p><b>60 Days</b></p>
+<p><b>60-Day Review</b></p>
 <ul>
-<li>Analyzes full 60-day performance.</li>
-<li>Includes comparison between the first 30 days and the next 30 days.</li>
-<li>Shows performance progression and system adaptation.</li>
+<li>Evaluates performance over 60 days.</li>
+<li>Includes a comparison between the first and second 30-day periods.</li>
 </ul>
 
-<p><b>90 Days</b></p>
+<p><b>90-Day Review</b></p>
 <ul>
-<li>Provides a broader performance view.</li>
-<li>Highlights consistency, volatility, and long-term behavior.</li>
+<li>Provides a broader performance overview.</li>
+<li>Focuses on consistency and longer-term execution.</li>
 </ul>
 
 <p><b>Detailed Review</b></p>
 <ul>
-<li>Analyzes the entire account history.</li>
-<li>Highlights drawdown, recovery, and balance progression.</li>
-<li>Best used for full client reporting.</li>
+<li>Analyzes the full account history.</li>
+<li>Includes a complete narrative covering drawdown and recovery phases.</li>
 </ul>
 
 <hr>
 
-<h4>5. Copy Functions</h4>
+<h4>5. Copy to GHL</h4>
 
-<p><b>Copy to GHL</b></p>
+<p>The “Copy to GHL” function generates a clean, structured summary for CRM use, including:</p>
+
 <ul>
-<li>Copies a clean, plain-text version of the analysis.</li>
-<li>Used for CRM notes or internal documentation.</li>
+<li>System</li>
+<li>Balance</li>
+<li>Closed Profit</li>
+<li>Floating P/L</li>
+<li>Growth (%)</li>
+<li>Track Record</li>
 </ul>
 
-<p><b>Copy to Email</b></p>
+<p><b>Important:</b></p>
 <ul>
-<li>Copies a formatted version ready to send to clients.</li>
-<li>Maintains readability and structure.</li>
+<li>Weekly results include metrics only.</li>
+<li>All other timeframes include a performance summary.</li>
 </ul>
 
-<p><b>Tip:</b> Always review the generated summary before copying to ensure it aligns with your messaging.</p>
+<p>Always review the output before sending to ensure it aligns with your communication standards.</p>
 `,
 
 desc: `
-<h3>System Features & Descriptions</h3>
+<h3>Understanding the Dashboard</h3>
 
-<h4>Core Metrics</h4>
+<h4>Account Overview</h4>
 
-<p><b>Balance</b><br>
-Final account value at the end of the selected period including all closed trades.</p>
+<p>
+The Account Overview reflects the <b>current state of the account</b>, based on all activity up to the most recent transaction.
+</p>
 
-<p><b>Closed Profit</b><br>
-Total profit or loss from all closed trades within the selected timeframe.</p>
+<ul>
+<li><b>Balance:</b> Current account value including all closed trades.</li>
+<li><b>Closed Profit:</b> Total realized profit or loss.</li>
+<li><b>Floating P/L:</b> Unrealized profit or loss from open positions.</li>
+<li><b>Growth (%):</b> Percentage change relative to the starting balance.</li>
+<li><b>Total Capital:</b> Net capital after deposits and withdrawals.</li>
+<li><b>Track Record:</b> Total number of active trading days.</li>
+<li><b>First Close:</b> Date of the first closed trade after onboarding.</li>
+<li><b>Last Activity:</b> Most recent recorded transaction or trade.</li>
+</ul>
 
-<p><b>Floating P/L</b><br>
-Current unrealized profit or loss from open trades.</p>
-
-<p><b>Growth (%)</b><br>
-Percentage gain or loss relative to the starting balance of the selected period.</p>
-
-<p><b>Total Capital</b><br>
-Starting balance before onboarding + deposits after onboarding − withdrawals.</p>
-
-<p><b>Track Record</b><br>
-Total number of days the account has been active from the first closed trade to the latest activity.</p>
-
-<p><b>First Close</b><br>
-Date of the first closed trade after onboarding.</p>
-
-<p><b>Last Activity</b><br>
-Most recent transaction or trade recorded.</p>
+<p>
+This section provides a clear, real-time snapshot of overall account performance.
+</p>
 
 <hr>
 
-<h4>Buttons & Actions</h4>
+<h4>Performance Results (Timeline-Based)</h4>
 
-<p><b>Weekly</b><br>
-Enables custom date range selection for short-term analysis.</p>
+<p>
+The cards displayed below the overview represent performance within the <b>selected timeframe</b>.
+</p>
 
-<p><b>30 / 60 / 90 Days</b><br>
-Automatically generates reports based on predefined timeframes.</p>
+<ul>
+<li>Each selection recalculates performance based only on that specific period.</li>
+<li>This allows you to evaluate how the system performed during defined time intervals.</li>
+</ul>
 
-<p><b>Detailed Review</b><br>
-Provides a full performance breakdown including drawdown and recovery.</p>
+<p><b>Key Distinction:</b></p>
 
-<p><b>Run Weekly</b><br>
-Executes analysis based on selected custom dates.</p>
-
-<p><b>Copy to GHL</b><br>
-Copies a simplified version for CRM use.</p>
-
-<p><b>Copy to Email</b><br>
-Copies a structured version for client communication.</p>
+<ul>
+<li><b>Account Overview:</b> Full account performance up to the latest activity.</li>
+<li><b>Timeline Results:</b> Performance within a selected timeframe.</li>
+</ul>
 
 <hr>
 
-<h4>System Behavior</h4>
+<h4>Weekly View</h4>
 
-<p>The selected system determines how trades are executed and how the account reacts to market conditions. Each system follows a different strategy model, which is reflected in the narrative.</p>
+<ul>
+<li>Automatically updates once dates are selected.</li>
+<li>Displays six key metrics in a simplified format.</li>
+<li>Does not include a performance summary.</li>
+<li>Uses the same track record as the Account Overview.</li>
+</ul>
+
+<hr>
+
+<h4>30 / 60 / 90 / Detailed Reviews</h4>
+
+<ul>
+<li>Include both metrics and a performance narrative.</li>
+<li>Provide insight into system behavior under varying market conditions.</li>
+<li>The 60-day review includes a comparative breakdown.</li>
+<li>The detailed review outlines the full performance cycle, including drawdowns and recovery.</li>
+</ul>
+
+<hr>
+
+<h4>How to Interpret the Data</h4>
+
+<ul>
+<li>Use the Account Overview to understand current performance.</li>
+<li>Use timeframe results to analyze specific periods.</li>
+<li>Compare both to clearly explain performance trends and system behavior.</li>
+</ul>
 `,
 
 calc: `
-<h3>Calculations & Logic</h3>
+<h3>Calculations & Methodology</h3>
 
-<h4>System Description</h4>
-<p id="systemGuideText">Select a system to view behavior.</p>
+<h4>System Behavior</h4>
+<p id="systemGuideText">Select a system to view its behavior and strategy profile.</p>
 
 <hr>
 
-<h4>Core Formulas</h4>
+<h4>Core Calculations</h4>
 
 <p><b>Balance</b><br>
 Deposits − Withdrawals + Closed Profit</p>
 
 <p><b>Closed Profit</b><br>
-Sum of all net profit values from closed trades within the selected period</p>
+Sum of all closed trades within the selected timeframe</p>
 
 <p><b>Floating P/L</b><br>
-Sum of net profit from all open positions</p>
+Sum of unrealized profit or loss from open trades</p>
 
 <p><b>Growth (%)</b><br>
 (Closed Profit ÷ Starting Balance) × 100</p>
 
 <p><b>Total Capital</b><br>
-(Balance before onboarding) + (Deposits after onboarding) − (Withdrawals after onboarding)</p>
+Starting balance + deposits − withdrawals</p>
 
 <p><b>Track Record</b><br>
-Last Activity Date − First Close Date</p>
+Number of days between first closed trade and most recent activity</p>
 
 <hr>
 
-<h4>Time-Based Logic</h4>
+<h4>Timeframe Logic</h4>
 
-<p><b>30 Days:</b> First 30 days from initial trade</p>
-<p><b>60 Days:</b> First 60 days with internal 30 vs 30 comparison</p>
-<p><b>90 Days:</b> Extended performance evaluation</p>
-<p><b>Weekly:</b> Custom date range selected by user</p>
+<p><b>Weekly:</b> Custom date range (automatically calculated)</p>
+<p><b>30 Days:</b> First 30 days from initial closed trade</p>
+<p><b>60 Days:</b> First 60 days with internal comparison</p>
+<p><b>90 Days:</b> Extended performance review</p>
 <p><b>Detailed:</b> Full account lifecycle analysis</p>
 
 <hr>
 
-<h4>Important Notes</h4>
+<h4>Key Notes</h4>
 
 <ul>
-<li>All calculations are based only on data within the selected timeframe.</li>
-<li>Growth is always relative to the starting balance of that timeframe.</li>
-<li>Open trades are excluded from closed profit but included in floating P/L.</li>
+<li>All calculations are restricted to the selected timeframe.</li>
+<li>Growth is always relative to the starting balance of that period.</li>
+<li>Open trades are excluded from closed profit calculations.</li>
+<li>The Weekly view does not include a narrative summary.</li>
 </ul>
 `
 };
